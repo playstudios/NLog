@@ -1,8 +1,8 @@
 version: "1"
 rules:
   - base: master
-    upstream: nlog:master
+    upstream: NLog:master
     mergeMethod: hardreset
   - base: dev
-    upstream: nlog:dev
+    upstream: NLog:dev
     mergeMethod: hardreset
