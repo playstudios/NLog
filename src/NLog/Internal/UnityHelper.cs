@@ -1,5 +1,6 @@
 #if UNITY
 
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace NLog.Internal
@@ -22,7 +23,11 @@ namespace NLog.Internal
 					return "file://" + Application.dataPath + "/StreamingAssets/";
 			}
 		}
-	}
+
+        [DllImport("__Internal")]
+        internal static extern string LoadFile(string url);
+
+    }
 }
 
 #endif

@@ -135,11 +135,6 @@ namespace NLog.Config
             }
         }
         
-#if UNITY
-        [DllImport("__Internal")]
-        private static extern string LoadFile(string url);
-#endif     
-
         /// <summary>
         /// Create XML reader for (xml config) file.
         /// </summary>
@@ -164,7 +159,7 @@ namespace NLog.Config
 				{
                     if (Application.platform == RuntimePlatform.WebGLPlayer)
                     {
-                        var text = LoadFile(fileName);
+                        var text = UnityHelper.LoadFile(fileName);
 
                         if (!string.IsNullOrEmpty(text))
                         {
