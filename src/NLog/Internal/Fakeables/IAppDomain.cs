@@ -41,7 +41,7 @@ namespace NLog.Internal.Fakeables
     /// </summary>
     public interface IAppDomain
     {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Gets or sets the base directory that the assembly resolver uses to probe for assemblies.
         /// </summary>
@@ -68,16 +68,16 @@ namespace NLog.Internal.Fakeables
         int Id { get; }
 #endif
 
-#if !SILVERLIGHT
-        /// <summary>
-        /// Process exit event.
-        /// </summary>
-        event EventHandler<EventArgs> ProcessExit;
+#if !SILVERLIGHT && !UNITY
+		/// <summary>
+		/// Process exit event.
+		/// </summary>
+		event EventHandler<EventArgs> ProcessExit;
         
         /// <summary>
         /// Domain unloaded event.
         /// </summary>
         event EventHandler<EventArgs> DomainUnload;
 #endif
-    }
+	}
 }

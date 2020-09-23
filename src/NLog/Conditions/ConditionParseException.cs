@@ -35,13 +35,13 @@ namespace NLog.Conditions
 {
     using System;
 
-    /// <summary>
-    /// Exception during parsing of condition expression.
-    /// </summary>
-#if !SILVERLIGHT
+	/// <summary>
+	/// Exception during parsing of condition expression.
+	/// </summary>
+#if !SILVERLIGHT && !UNITY
     [Serializable]
 #endif
-    public class ConditionParseException : Exception 
+	public class ConditionParseException : Exception 
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ConditionParseException" /> class.
@@ -69,7 +69,7 @@ namespace NLog.Conditions
         {
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Initializes a new instance of the <see cref="ConditionParseException" /> class.
         /// </summary>
@@ -86,5 +86,5 @@ namespace NLog.Conditions
         {
         }
 #endif
-    }
+	}
 }

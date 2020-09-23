@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
 namespace NLog
 {
@@ -45,7 +45,7 @@ namespace NLog
     [CLSCompliant(false)]
     public partial interface ILoggerBase
     {
-        #region Log() overloads
+#region Log() overloads
 
         /// <summary>
         /// Writes the diagnostic message at the specified level.
@@ -363,7 +363,7 @@ namespace NLog
         [StringFormatMethod("message")]
         void Log(LogLevel level, string message, ulong argument);
 
-        #endregion
+#endregion
     }
 }
 

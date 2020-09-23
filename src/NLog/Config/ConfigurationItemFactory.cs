@@ -200,7 +200,7 @@ namespace NLog.Config
         /// <param name="itemNamePrefix">Item name prefix.</param>
         public void RegisterItemsFromAssembly(Assembly assembly, string itemNamePrefix)
         {
-            InternalLogger.Debug("ScanAssembly('{0}')", assembly.FullName);
+            InternalLogger.Debug("ScanAssembly('{0}','{1}')", assembly.FullName, itemNamePrefix);
             var typesToScan = assembly.SafeGetTypes();
             foreach (IFactory f in this.allFactories)
             {
@@ -241,7 +241,7 @@ namespace NLog.Config
             var nlogAssembly = typeof(ILogger).Assembly;
             var factory = new ConfigurationItemFactory(nlogAssembly);
             factory.RegisterExtendedItems();
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
             var assemblyLocation = Path.GetDirectoryName(new Uri(nlogAssembly.CodeBase).LocalPath);
             if (assemblyLocation == null)
@@ -293,7 +293,7 @@ namespace NLog.Config
             InternalLogger.Debug("Auto loading done");
 #endif
 
-            return factory;
+			return factory;
         }
 
         /// <summary>

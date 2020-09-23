@@ -32,7 +32,7 @@
 // 
 
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
 namespace NLog.Targets
 {

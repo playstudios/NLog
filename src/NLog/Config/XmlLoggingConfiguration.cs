@@ -55,6 +55,11 @@ namespace NLog.Config
 // ReSharper disable once RedundantUsingDirective
     using System.Windows;
 #endif
+    
+#if UNITY
+    using System.Runtime.InteropServices;
+    using UnityEngine;
+#endif     
 
     /// <summary>
     /// A class for configuring NLog through an XML configuration file 
@@ -70,7 +75,7 @@ namespace NLog.Config
         /// </summary>
         internal const string AssetsPrefix = "assets/";
 #endif
-
+		
         #region private fields
 
         private readonly Dictionary<string, bool> fileMustAutoReloadLookup = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -129,6 +134,11 @@ namespace NLog.Config
                 this.Initialize(reader, fileName, ignoreErrors);
             }
         }
+        
+#if UNITY
+        [DllImport("__Internal")]
+        private static extern string LoadFile(string url);
+#endif     
 
         /// <summary>
         /// Create XML reader for (xml config) file.
@@ -149,8 +159,53 @@ namespace NLog.Config
                     Stream stream = Android.App.Application.Context.Assets.Open(fileName);
                     return XmlReader.Create(stream);
                 }
+#elif UNITY
+				if (fileName.EndsWith(".xml"))
+				{
+                    if (Application.platform == RuntimePlatform.WebGLPlayer)
+                    {
+                        var text = LoadFile(fileName);
+
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            return XmlReader.Create(new StringReader(text));
+                        }
+                    }
+                    else
+                    {
+                        var www = new WWW(fileName);
+                        while (!www.isDone)
+                        {
+                            if (string.IsNullOrEmpty(www.error))
+                            {
+                                continue;
+                            }
+
+                            break;
+                        }
+
+                        if (string.IsNullOrEmpty(www.error))
+                        {
+                            return XmlReader.Create(new StringReader(www.text));
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    }
+                }
+				else
+				{
+					var text = Resources.Load(fileName) as TextAsset;
+
+					if (text != null)
+					{
+						return XmlReader.Create(new StringReader(text.ToString()));
+					}
+				}
 #endif
-                return XmlReader.Create(fileName);
+
+				return XmlReader.Create(fileName);
             }
             return null;
         }
@@ -235,7 +290,7 @@ namespace NLog.Config
 
         #region public properties
 
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__  && !UNITY
         /// <summary>
         /// Gets the default <see cref="LoggingConfiguration" /> object by parsing 
         /// the application configuration file (<c>app.exe.config</c>).
@@ -531,7 +586,7 @@ namespace NLog.Config
             InternalLogger.LogToConsoleError = nlogElement.GetOptionalBooleanAttribute("internalLogToConsoleError", InternalLogger.LogToConsoleError);
             InternalLogger.LogFile = nlogElement.GetOptionalAttribute("internalLogFile", InternalLogger.LogFile);
             
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
             InternalLogger.LogToTrace = nlogElement.GetOptionalBooleanAttribute("internalLogToTrace", InternalLogger.LogToTrace);
 #endif
             InternalLogger.IncludeTimestamp = nlogElement.GetOptionalBooleanAttribute("internalLogIncludeTimestamp", InternalLogger.IncludeTimestamp);

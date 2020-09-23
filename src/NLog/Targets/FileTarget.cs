@@ -31,6 +31,9 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+using System.CodeDom;
+using System.IO.IsolatedStorage;
+
 namespace NLog.Targets
 {
     using System;
@@ -38,10 +41,10 @@ namespace NLog.Targets
     using System.ComponentModel;
     using System.Globalization;
     using System.IO;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
     using System.IO.Compression;
 #endif
-    using System.Linq;
+	using System.Linq;
     using System.Text;
     using System.Threading;
     using Common;
@@ -80,19 +83,19 @@ namespace NLog.Targets
         /// </summary>
         private readonly static char[] DirectorySeparatorChars = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
         /// <summary>
         /// Cached invalid filenames char array to avoid memory allocation everytime Path.GetInvalidFileNameChars() is called.
         /// </summary>
         private readonly static char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
-#endif 
-        /// <summary>
-        /// Holds the initialised files each given time by the <see cref="FileTarget"/> instance. Against each file, the last write time is stored. 
-        /// </summary>
-        /// <remarks>Last write time is store in local time (no UTC).</remarks>
-        private readonly Dictionary<string, DateTime> initializedFiles = new Dictionary<string, DateTime>();
+#endif
+		/// <summary>
+		/// Holds the initialised files each given time by the <see cref="FileTarget"/> instance. Against each file, the last write time is stored. 
+		/// </summary>
+		/// <remarks>Last write time is store in local time (no UTC).</remarks>
+		private readonly Dictionary<string, DateTime> initializedFiles = new Dictionary<string, DateTime>();
 
         private LineEndingMode lineEndingMode = LineEndingMode.Default;
 
@@ -109,15 +112,15 @@ namespace NLog.Targets
 
         private Timer autoClosingTimer;
 
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
         private Thread appenderInvalidatorThread = null;
         private EventWaitHandle stopAppenderInvalidatorThreadWaitHandle = new ManualResetEvent(false);
 #endif
 
-        /// <summary>
-        /// The number of initialised files at any one time.
-        /// </summary>
-        private int initializedFilesCounter;
+		/// <summary>
+		/// The number of initialised files at any one time.
+		/// </summary>
+		private int initializedFilesCounter;
 
         /// <summary>
         /// The maximum number of archive files that should be kept.
@@ -180,17 +183,17 @@ namespace NLog.Targets
             this.ArchiveAboveSize = FileTarget.ArchiveAboveSizeDisabled;
             this.ConcurrentWriteAttempts = 10;
             this.ConcurrentWrites = true;
-#if SILVERLIGHT
-            this.Encoding = Encoding.UTF8;
+#if SILVERLIGHT || UNITY
+			this.Encoding = Encoding.UTF8;
 #else
             this.Encoding = Encoding.Default;
 #endif
             this.BufferSize = 32768;
             this.AutoFlush = true;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             this.FileAttributes = Win32FileAttributes.Normal;
 #endif
-            this.LineEnding = LineEndingMode.Default;
+			this.LineEnding = LineEndingMode.Default;
             this.EnableFileDelete = true;
             this.OpenFileCacheTimeout = -1;
             this.OpenFileCacheSize = 5;
@@ -357,7 +360,7 @@ namespace NLog.Targets
         [DefaultValue(true)]
         public bool EnableFileDelete { get; set; }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Gets or sets the file attributes (Windows only).
         /// </summary>
@@ -366,11 +369,11 @@ namespace NLog.Targets
         public Win32FileAttributes FileAttributes { get; set; }
 #endif
 
-        /// <summary>
-        /// Gets or sets the line ending mode.
-        /// </summary>
-        /// <docgen category='Layout Options' order='10' />
-        [Advanced]
+		/// <summary>
+		/// Gets or sets the line ending mode.
+		/// </summary>
+		/// <docgen category='Layout Options' order='10' />
+		[Advanced]
         public LineEndingMode LineEnding
         {
             get
@@ -699,7 +702,7 @@ namespace NLog.Targets
         /// </summary>
         private void RefreshArchiveFilePatternToWatch()
         {
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
             if (this.fileAppenderCache != null)
             {
                 bool mustWatchArchiving = IsArchivingEnabled() && ConcurrentWrites && KeepFileOpen;
@@ -752,27 +755,27 @@ namespace NLog.Targets
                 }
             }
 #endif
-        }
+		}
 
-        private void StopAppenderInvalidatorThread()
+		private void StopAppenderInvalidatorThread()
         {
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
             if (this.appenderInvalidatorThread != null)
             {
                 this.stopAppenderInvalidatorThreadWaitHandle.Set();
                 this.appenderInvalidatorThread = null;
             }
 #endif
-        }
+		}
 
-        /// <summary>
-        /// Removes records of initialized files that have not been 
-        /// accessed in the last two days.
-        /// </summary>
-        /// <remarks>
-        /// Files are marked 'initialized' for the purpose of writing footers when the logging finishes.
-        /// </remarks>
-        public void CleanupInitializedFiles()
+		/// <summary>
+		/// Removes records of initialized files that have not been 
+		/// accessed in the last two days.
+		/// </summary>
+		/// <remarks>
+		/// Files are marked 'initialized' for the purpose of writing footers when the logging finishes.
+		/// </remarks>
+		public void CleanupInitializedFiles()
         {
             this.CleanupInitializedFiles(DateTime.UtcNow.AddDays(-FileTarget.InitializedFilesCleanupPeriod));
         }
@@ -850,7 +853,7 @@ namespace NLog.Targets
             }
             else if (this.ConcurrentWrites)
             {
-#if SILVERLIGHT
+#if SILVERLIGHT || UNITY
                 return RetryingMultiProcessFileAppender.TheFactory;
 #elif MONO
                 //
@@ -865,7 +868,7 @@ namespace NLog.Targets
                     return MutexMultiProcessFileAppender.TheFactory;
                 }
 #else
-                return MutexMultiProcessFileAppender.TheFactory;
+				return MutexMultiProcessFileAppender.TheFactory;
 #endif
             }
             else if (IsArchivingEnabled())
@@ -994,11 +997,11 @@ namespace NLog.Targets
 
         private void ProcessLogEvent(LogEventInfo logEvent, string fileName, byte[] bytesToWrite)
         {
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
             this.fileAppenderCache.InvalidateAppendersForInvalidFiles();
 #endif
 
-            string fileToArchive = this.GetFileCharacteristics(fileName) != null ? fileName : previousLogFileName;
+			string fileToArchive = this.GetFileCharacteristics(fileName) != null ? fileName : previousLogFileName;
             if (this.ShouldAutoArchive(fileToArchive, logEvent, bytesToWrite.Length))
                 this.DoAutoArchive(fileToArchive, logEvent);
 
@@ -1213,11 +1216,14 @@ namespace NLog.Targets
 
                 nextNumber++;
             }
-            catch (DirectoryNotFoundException)
-            {
-                Directory.CreateDirectory(dirName);
-                nextNumber = 0;
-            }
+			catch (Exception ex)
+			{
+				if (ex is DirectoryNotFoundException || ex is IsolatedStorageException)
+				{
+					Directory.CreateDirectory(dirName);
+					nextNumber = 0;
+				}
+			}
 
             if (minNumber != -1 && ShouldDeleteOldArchives())
             {
@@ -2000,17 +2006,21 @@ namespace NLog.Targets
                     }
                 }
             }
-            catch (DirectoryNotFoundException)
-            {
-                if (!this.CreateDirs || !firstAttempt)
-                {
-                    throw;
-                }
-                Directory.CreateDirectory(Path.GetDirectoryName(fileName));
-                //retry.
-                ReplaceFileContent(fileName, bytes, false);
-            }
-        }
+			catch (Exception ex)
+			{
+				if (ex is DirectoryNotFoundException || ex is IsolatedStorageException)
+				{
+					if (!this.CreateDirs || !firstAttempt)
+					{
+						throw;
+					}
+					Directory.CreateDirectory(Path.GetDirectoryName(fileName));
+					//retry.
+					ReplaceFileContent(fileName, bytes, false);
+				}
+			}
+
+		}
 
         /// <summary>
         /// Writes the header information to a file.
@@ -2044,10 +2054,10 @@ namespace NLog.Targets
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Exists)
             {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 fileCharacteristics = new FileCharacteristics(fileInfo.CreationTimeUtc, fileInfo.LastWriteTimeUtc, fileInfo.Length);
 #else
-                fileCharacteristics = new FileCharacteristics(fileInfo.CreationTime, fileInfo.LastWriteTime, fileInfo.Length);
+				fileCharacteristics = new FileCharacteristics(fileInfo.CreationTime, fileInfo.LastWriteTime, fileInfo.Length);
 #endif
                 return fileCharacteristics;
             }
@@ -2089,7 +2099,7 @@ namespace NLog.Targets
                 return fileName;
             }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
             var lastDirSeparator = fileName.LastIndexOfAny(DirectorySeparatorChars);
 
@@ -2123,7 +2133,7 @@ namespace NLog.Targets
 
 
 #else
-            return fileName;
+			return fileName;
 #endif
         }
 

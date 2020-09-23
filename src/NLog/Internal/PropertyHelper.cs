@@ -288,7 +288,7 @@ namespace NLog.Internal
 
         private static bool TryTypeConverterConversion(Type type, string value, out object newValue)
         {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             var converter = TypeDescriptor.GetConverter(type);
             if (converter.CanConvertFrom(typeof(string)))
             {
@@ -296,7 +296,7 @@ namespace NLog.Internal
                 return true;
             }
 #else
-            if (type == typeof(LineEndingMode))
+			if (type == typeof(LineEndingMode))
             {
                 newValue = LineEndingMode.FromString(value);
                 return true;

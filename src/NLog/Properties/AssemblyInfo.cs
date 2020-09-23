@@ -57,12 +57,15 @@ using System.Security;
 	[assembly: AssemblyTitle("NLog for Windows Phone 8")]
 #elif __ANDROID__
 	[assembly: AssemblyTitle("NLog for Xamarin Android")]
+#elif UNITY
+	[assembly: AssemblyTitle("NLog for Unity")]	
 #else
 #error Unrecognized build target - please update AssemblyInfo.cs
 #endif
 
 [assembly: AssemblyDescription("NLog")]
 [assembly: AssemblyConfiguration("")]
+[assembly: AssemblyVersionAttribute("4.3.5.0")]
 [assembly: AssemblyCompany("NLog")]
 [assembly: AssemblyCopyright("Copyright (c) 2004-2016 Jaroslaw Kowalski, Kim Christensen, Julian Verdurmen")]
 [assembly: AssemblyCulture("")]
@@ -76,7 +79,7 @@ using System.Security;
 #endif
 #if !SILVERLIGHT4
 [assembly: AllowPartiallyTrustedCallers]
-#if !NET3_5 && !MONO_2_0 && !SILVERLIGHT5 && !__IOS__ && !WINDOWS_PHONE
+#if !NET3_5 && !MONO_2_0 && !SILVERLIGHT5 && !__IOS__ && !WINDOWS_PHONE	&& !UNITY
 [assembly: SecurityRules(SecurityRuleSet.Level1)]
 #endif
 #endif

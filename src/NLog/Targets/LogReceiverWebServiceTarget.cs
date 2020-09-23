@@ -294,7 +294,7 @@ namespace NLog.Targets
                 };
 
             this.inCall = true;
-#if SILVERLIGHT 
+#if SILVERLIGHT || UNITY
             if (!Deployment.Current.Dispatcher.CheckAccess())
             {
                 Deployment.Current.Dispatcher.BeginInvoke(() => client.ProcessLogMessagesAsync(events));
@@ -307,7 +307,7 @@ namespace NLog.Targets
             client.ProcessLogMessagesAsync(events);
 #endif
 #else
-            var client = new SoapLogReceiverClient(this.EndpointAddress);
+			var client = new SoapLogReceiverClient(this.EndpointAddress);
             this.inCall = true;
             client.BeginProcessLogMessages(
                 events,

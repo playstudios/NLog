@@ -47,7 +47,7 @@ namespace NLog.Internal.Fakeables
         /// <param name="appDomain">The <see cref="AppDomain"/> to wrap.</param>
         public AppDomainWrapper(AppDomain appDomain)
         {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             BaseDirectory = appDomain.BaseDirectory;
             ConfigurationFile = appDomain.SetupInformation.ConfigurationFile;
 
@@ -61,7 +61,7 @@ namespace NLog.Internal.Fakeables
             
 #endif
 #if !SILVERLIGHT
-            appDomain.ProcessExit += OnProcessExit;
+			appDomain.ProcessExit += OnProcessExit;
             appDomain.DomainUnload += OnDomainUnload;
 #endif
         }
@@ -71,7 +71,7 @@ namespace NLog.Internal.Fakeables
         /// </summary>
         public static AppDomainWrapper CurrentDomain { get { return new AppDomainWrapper(AppDomain.CurrentDomain); } }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Gets or sets the base directory that the assembly resolver uses to probe for assemblies.
         /// </summary>
@@ -99,10 +99,10 @@ namespace NLog.Internal.Fakeables
 #endif
 
 #if !SILVERLIGHT
-        /// <summary>
-        /// Process exit event.
-        /// </summary>
-        public event EventHandler<EventArgs> ProcessExit;
+		/// <summary>
+		/// Process exit event.
+		/// </summary>
+		public event EventHandler<EventArgs> ProcessExit;
 
         /// <summary>
         /// Domain unloaded event.

@@ -46,17 +46,17 @@ namespace NLog.Internal
 		{
             get
             {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 string newline = Environment.NewLine;
 #else
-                string newline = "\r\n";
+				string newline = "\r\n";
 #endif
 
                 return newline;
             }
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         internal static string GetSafeEnvironmentVariable(string name)
         {
             try
@@ -76,5 +76,5 @@ namespace NLog.Internal
             }
         }
 #endif
-    }
+	}
 }

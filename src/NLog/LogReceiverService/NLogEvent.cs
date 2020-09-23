@@ -41,7 +41,6 @@ namespace NLog.LogReceiverService
     using System.Runtime.Serialization;
 #endif
     using System.Text;
-    using System.Xml.Serialization;
 
     /// <summary>
     /// Wire format for NLog Event.
@@ -49,7 +48,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
     [DataContract(Name = "e", Namespace = LogReceiverServiceConfig.WebServiceNamespace)]
 #endif
-    [XmlType(Namespace = LogReceiverServiceConfig.WebServiceNamespace)]
     [DebuggerDisplay("Event ID = {Id} Level={LevelName} Values={Values.Count}")]
     public class NLogEvent
     {
@@ -67,7 +65,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "id", Order = 0)]
 #endif
-        [XmlElement("id", Order = 0)]
         public int Id { get; set; }
 
         /// <summary>
@@ -76,7 +73,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "lv", Order = 1)]
 #endif
-        [XmlElement("lv", Order = 1)]
         public int LevelOrdinal { get; set; }
 
         /// <summary>
@@ -86,7 +82,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "lg", Order = 2)]
 #endif
-        [XmlElement("lg", Order = 2)]
         public int LoggerOrdinal { get; set; }
 
         /// <summary>
@@ -95,7 +90,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "ts", Order = 3)]
 #endif
-        [XmlElement("ts", Order = 3)]
         public long TimeDelta { get; set; }
 
         /// <summary>
@@ -104,7 +98,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "m", Order = 4)]
 #endif
-        [XmlElement("m", Order = 4)]
         public int MessageOrdinal { get; set; }
 
         /// <summary>
@@ -113,7 +106,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "val", Order = 100)]
 #endif
-        [XmlElement("val", Order = 100)]
         public string Values
         {
             get
@@ -163,7 +155,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [IgnoreDataMember]
 #endif
-        [XmlIgnore]
         internal IList<int> ValueIndexes { get; private set; }
 
         /// <summary>

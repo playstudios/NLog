@@ -31,6 +31,8 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+using System.CodeDom;
+using System.IO.IsolatedStorage;
 using System.Security;
 
 namespace NLog.Internal.FileAppenders
@@ -172,15 +174,18 @@ namespace NLog.Internal.FileAppenders
                     {
                         return this.TryCreateFileStream(allowFileSharedWriting);
                     }
-                    catch (DirectoryNotFoundException)
+					catch (Exception ex)
                     {
-                        if (!this.CreateFileParameters.CreateDirs)
-                        {
-                            throw;
-                        }
+	                    if (ex is DirectoryNotFoundException || ex is IsolatedStorageException)
+	                    {
+		                    if (!this.CreateFileParameters.CreateDirs)
+		                    {
+			                    throw;
+		                    }
 
-                        Directory.CreateDirectory(Path.GetDirectoryName(this.FileName));
-                        return this.TryCreateFileStream(allowFileSharedWriting);
+		                    Directory.CreateDirectory(Path.GetDirectoryName(this.FileName));
+		                    return this.TryCreateFileStream(allowFileSharedWriting);
+	                    }
                     }
                 }
                 catch (IOException)
@@ -200,7 +205,7 @@ namespace NLog.Internal.FileAppenders
             throw new InvalidOperationException("Should not be reached.");
         }
 
-#if !SILVERLIGHT && !MONO && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !MONO && !__IOS__ && !__ANDROID__ && !UNITY
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "Objects are disposed elsewhere")]
         private FileStream WindowsCreateFile(string fileName, bool allowFileSharedWriting)
         {
@@ -256,7 +261,7 @@ namespace NLog.Internal.FileAppenders
         {
             UpdateCreationTime();
 
-#if !SILVERLIGHT && !MONO && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !MONO && !__IOS__ && !__ANDROID__ && !UNITY
             try
             {
                 if (!this.CreateFileParameters.ForceManaged && PlatformDetector.IsDesktopWin32)
@@ -278,7 +283,7 @@ namespace NLog.Internal.FileAppenders
 
             return new FileStream(
                 this.FileName,
-                FileMode.Append,
+				FileMode.Append,
                 FileAccess.Write,
                 fileShare,
                 this.CreateFileParameters.BufferSize);
@@ -288,22 +293,22 @@ namespace NLog.Internal.FileAppenders
         {
             if (File.Exists(this.FileName))
             {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 this.CreationTime = File.GetCreationTimeUtc(this.FileName);
 #else
-                this.CreationTime = File.GetCreationTime(this.FileName);
+				this.CreationTime = File.GetCreationTime(this.FileName);
 #endif
             }
             else
             {
                 File.Create(this.FileName).Dispose();
-                
-#if !SILVERLIGHT
+
+#if !SILVERLIGHT && !UNITY
                 this.CreationTime = DateTime.UtcNow;
                 // Set the file's creation time to avoid being thwarted by Windows' Tunneling capabilities (https://support.microsoft.com/en-us/kb/172190).
                 File.SetCreationTimeUtc(this.FileName, this.CreationTime);
 #else
-                this.CreationTime = File.GetCreationTime(this.FileName);
+				this.CreationTime = File.GetCreationTime(this.FileName);
 #endif
             }
         }

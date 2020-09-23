@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
 namespace NLog
 {
@@ -45,7 +45,7 @@ namespace NLog
     [CLSCompliant(false)]
     public partial interface ILogger 
     {     
-        #region Trace() overloads 
+#region Trace() overloads 
 
         /// <summary>
         /// Writes the diagnostic message at the <c>Trace</c> level.
@@ -332,9 +332,9 @@ namespace NLog
         [StringFormatMethod("message")]
         void Trace(string message, ulong argument);
 
-        #endregion
+#endregion
 
-        #region Debug() overloads 
+#region Debug() overloads 
 
         /// <summary>
         /// Writes the diagnostic message at the <c>Debug</c> level.
@@ -619,9 +619,9 @@ namespace NLog
         [StringFormatMethod("message")]
         void Debug(string message, ulong argument);
 
-        #endregion
+#endregion
 
-        #region Info() overloads 
+#region Info() overloads 
 
         /// <summary>
         /// Writes the diagnostic message at the <c>Info</c> level.
@@ -907,9 +907,9 @@ namespace NLog
         [StringFormatMethod("message")]
         void Info(string message, ulong argument);
 
-        #endregion
+#endregion
 
-        #region Warn() overloads 
+#region Warn() overloads 
 
         /// <summary>
         /// Writes the diagnostic message at the <c>Warn</c> level.
@@ -1197,9 +1197,9 @@ namespace NLog
         [StringFormatMethod("message")]
         void Warn(string message, ulong argument);
 
-        #endregion
+#endregion
 
-        #region Error() overloads 
+#region Error() overloads 
 
         /// <summary>
         /// Writes the diagnostic message at the <c>Error</c> level.
@@ -1482,9 +1482,9 @@ namespace NLog
         [StringFormatMethod("message")]
         void Error(string message, ulong argument);
 
-        #endregion
+#endregion
 
-        #region Fatal() overloads 
+#region Fatal() overloads 
 
         /// <summary>
         /// Writes the diagnostic message at the <c>Fatal</c> level.
@@ -1769,7 +1769,7 @@ namespace NLog
         [StringFormatMethod("message")]
         void Fatal(string message, ulong argument);
 
-        #endregion
+#endregion
     }
 }
 

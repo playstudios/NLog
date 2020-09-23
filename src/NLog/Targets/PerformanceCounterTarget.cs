@@ -33,7 +33,7 @@
 
 
 
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
 
 namespace NLog.Targets
 {

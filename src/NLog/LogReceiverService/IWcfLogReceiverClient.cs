@@ -135,7 +135,7 @@ namespace NLog.LogReceiverService
         /// <param name="result">The result.</param>
         void EndProcessLogMessages(IAsyncResult result);
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Instructs the inner channel to display a user interface if one is required to initialize the channel prior to using it.
         /// </summary>

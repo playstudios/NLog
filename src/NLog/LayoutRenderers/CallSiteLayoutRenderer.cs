@@ -56,17 +56,17 @@ namespace NLog.LayoutRenderers
             this.ClassName = true;
             this.MethodName = true;
             this.CleanNamesOfAnonymousDelegates = false;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             this.FileName = false;
             this.IncludeSourcePath = true;
 #endif
-        }
+		}
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to render the class name.
-        /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
+		/// <summary>
+		/// Gets or sets a value indicating whether to render the class name.
+		/// </summary>
+		/// <docgen category='Rendering Options' order='10' />
+		[DefaultValue(true)]
         public bool ClassName { get; set; }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace NLog.LayoutRenderers
         [DefaultValue(0)]
         public int SkipFrames { get; set; }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Gets or sets a value indicating whether to render the source file name and line number.
         /// </summary>
@@ -105,21 +105,21 @@ namespace NLog.LayoutRenderers
         public bool IncludeSourcePath { get; set; }
 #endif
 
-        /// <summary>
-        /// Gets the level of stack trace information required by the implementing class.
-        /// </summary>
-        StackTraceUsage IUsesStackTrace.StackTraceUsage
+		/// <summary>
+		/// Gets the level of stack trace information required by the implementing class.
+		/// </summary>
+		StackTraceUsage IUsesStackTrace.StackTraceUsage
         {
             get
             {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 if (this.FileName)
                 {
                     return StackTraceUsage.Max;
                 }
 #endif
 
-                return StackTraceUsage.WithoutSource;
+				return StackTraceUsage.WithoutSource;
             }
         }
 
@@ -191,7 +191,7 @@ namespace NLog.LayoutRenderers
                     }
                 }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 if (this.FileName)
                 {
                     string fileName = frame.GetFileName();
@@ -213,7 +213,7 @@ namespace NLog.LayoutRenderers
                     }
                 }
 #endif
-            }
-        }
+			}
+		}
     }
 }

@@ -71,10 +71,10 @@ namespace NLog
             if (stu != StackTraceUsage.None && !logEvent.HasStackTrace)
             {
                 StackTrace stackTrace;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 stackTrace = new StackTrace(StackTraceSkipMethods, stu == StackTraceUsage.WithSource);
 #else
-                stackTrace = new StackTrace();
+				stackTrace = new StackTrace();
 #endif
 
                 int firstUserFrame = FindCallingMethodOnStackTrace(stackTrace, loggerType);

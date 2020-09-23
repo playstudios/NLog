@@ -35,13 +35,13 @@ namespace NLog.Conditions
 {
     using System;
 
-    /// <summary>
-    /// Exception during evaluation of condition expression.
-    /// </summary>
-#if !SILVERLIGHT
+	/// <summary>
+	/// Exception during evaluation of condition expression.
+	/// </summary>
+#if !SILVERLIGHT && !UNITY
     [Serializable]
 #endif
-    public class ConditionEvaluationException : Exception 
+	public class ConditionEvaluationException : Exception 
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ConditionEvaluationException" /> class.
@@ -69,7 +69,7 @@ namespace NLog.Conditions
         {
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Initializes a new instance of the <see cref="ConditionEvaluationException" /> class.
         /// </summary>
@@ -86,5 +86,5 @@ namespace NLog.Conditions
         {
         }
 #endif
-    }
+	}
 }

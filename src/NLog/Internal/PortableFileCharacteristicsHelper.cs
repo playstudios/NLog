@@ -52,10 +52,10 @@ namespace NLog.Internal
             var fileInfo = new FileInfo(fileName);
             if (fileInfo.Exists)
             {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                 return new FileCharacteristics(fileInfo.CreationTimeUtc, fileInfo.LastWriteTimeUtc, fileInfo.Length);
 #else
-                return new FileCharacteristics(fileInfo.CreationTime, fileInfo.LastWriteTime, fileInfo.Length);
+				return new FileCharacteristics(fileInfo.CreationTime, fileInfo.LastWriteTime, fileInfo.Length);
 #endif
             }
             else

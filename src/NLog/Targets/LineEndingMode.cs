@@ -128,10 +128,10 @@ namespace NLog.Targets
             if (name.Equals(Default.Name, StringComparison.OrdinalIgnoreCase)) return Default;
             if (name.Equals(None.Name, StringComparison.OrdinalIgnoreCase)) return None;
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             throw new ArgumentOutOfRangeException("name", name, "LineEndingMode is out of range");
 #else
-            throw new ArgumentOutOfRangeException("name", "LineEndingMode is out of range");
+			throw new ArgumentOutOfRangeException("name", "LineEndingMode is out of range");
 #endif
         }
 

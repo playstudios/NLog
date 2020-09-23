@@ -41,7 +41,6 @@ namespace NLog.LogReceiverService
     using System.Runtime.Serialization;
     using System.ServiceModel;
 #endif
-    using System.Xml.Serialization;
 
     /// <summary>
     /// Wire format for NLog event package.
@@ -49,8 +48,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
     [DataContract(Name = "events", Namespace = LogReceiverServiceConfig.WebServiceNamespace)]
 #endif
-    [XmlType(Namespace = LogReceiverServiceConfig.WebServiceNamespace)]
-    [XmlRoot("events", Namespace = LogReceiverServiceConfig.WebServiceNamespace)]
     [DebuggerDisplay("Count = {Events.Length}")]
     public class NLogEvents
     {
@@ -61,7 +58,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "cli", Order = 0)]
 #endif
-        [XmlElement("cli", Order = 0)]
         public string ClientName { get; set; }
 
         /// <summary>
@@ -71,7 +67,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "bts", Order = 1)]
 #endif
-        [XmlElement("bts", Order = 1)]
         public long BaseTimeUtc { get; set; }
 
         /// <summary>
@@ -81,8 +76,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "lts", Order = 100)]
 #endif
-        [XmlArray("lts", Order = 100)]
-        [XmlArrayItem("l")]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly", Justification = "This is needed for serialization.")]
         public StringCollection LayoutNames { get; set; }
 
@@ -93,8 +86,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "str", Order = 200)]
 #endif
-        [XmlArray("str", Order = 200)]
-        [XmlArrayItem("l")]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly", Justification = "Setter is needed for serialization.")]
         public StringCollection Strings { get; set; }
 
@@ -105,8 +96,6 @@ namespace NLog.LogReceiverService
 #if WCF_SUPPORTED
         [DataMember(Name = "ev", Order = 1000)]
 #endif
-        [XmlArray("ev", Order = 1000)]
-        [XmlArrayItem("e")]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2227:CollectionPropertiesShouldBeReadOnly", Justification = "Setter is needed for serialization.")]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1819:PropertiesShouldNotReturnArrays", Justification = "This is for serialization")]
         public NLogEvent[] Events { get; set; }

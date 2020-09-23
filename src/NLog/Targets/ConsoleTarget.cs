@@ -66,7 +66,7 @@ namespace NLog.Targets
         [DefaultValue(false)]
         public bool Error { get; set; }
 
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
         /// <summary>
         /// The encoding for writing messages to the <see cref="Console"/>.
         ///  </summary>
@@ -78,13 +78,13 @@ namespace NLog.Targets
         }
 #endif
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ConsoleTarget" /> class.
-        /// </summary>
-        /// <remarks>
-        /// The default value of the layout is: <code>${longdate}|${level:uppercase=true}|${logger}|${message}</code>
-        /// </remarks>
-        public ConsoleTarget() : base()
+		/// <summary>
+		/// Initializes a new instance of the <see cref="ConsoleTarget" /> class.
+		/// </summary>
+		/// <remarks>
+		/// The default value of the layout is: <code>${longdate}|${level:uppercase=true}|${logger}|${message}</code>
+		/// </remarks>
+		public ConsoleTarget() : base()
         {
         }
 
@@ -146,12 +146,12 @@ namespace NLog.Targets
         {
             if (this.Error)
             {
-                Console.Error.WriteLine(textLine);
+				Console.Error.WriteLine(textLine);
             }
             else
             {
-                Console.Out.WriteLine(textLine);
-            }
+				Console.Out.WriteLine(textLine);
+			}
         }
     }
 }

@@ -45,7 +45,7 @@ namespace NLog.Config
     /// </summary>
     public sealed class InstallationContext : IDisposable
     {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Mapping between log levels and console output colors.
         /// </summary>
@@ -60,10 +60,10 @@ namespace NLog.Config
         };
 #endif
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="InstallationContext"/> class.
-        /// </summary>
-        public InstallationContext()
+		/// <summary>
+		/// Initializes a new instance of the <see cref="InstallationContext"/> class.
+		/// </summary>
+		public InstallationContext()
             : this(TextWriter.Null)
         {
         }
@@ -187,8 +187,8 @@ namespace NLog.Config
                     message = string.Format(CultureInfo.InvariantCulture, message, arguments);
                 }
 
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
-                var oldColor = Console.ForegroundColor;
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID_ && !UNITY
+				var oldColor = Console.ForegroundColor;
                 Console.ForegroundColor = logLevel2ConsoleColor[logLevel];
 
                 try

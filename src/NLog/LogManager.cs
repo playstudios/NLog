@@ -65,7 +65,7 @@ namespace NLog
         [Obsolete]
         public delegate CultureInfo GetCultureInfo();
 
-#if !SILVERLIGHT && !MONO
+#if !SILVERLIGHT && !MONO && !UNITY
         /// <summary>
         /// Initializes static members of the LogManager class.
         /// </summary>
@@ -76,10 +76,10 @@ namespace NLog
         }
 #endif
 
-        /// <summary>
-        /// Prevents a default instance of the LogManager class from being created.
-        /// </summary>
-        private LogManager()
+		/// <summary>
+		/// Prevents a default instance of the LogManager class from being created.
+		/// </summary>
+		private LogManager()
         {
         }
 
@@ -100,7 +100,7 @@ namespace NLog
             remove { factory.ConfigurationChanged -= value; }
         }
 
-#if !SILVERLIGHT && !__IOS__ && !__ANDROID__
+#if !SILVERLIGHT && !__IOS__ && !__ANDROID__ && !UNITY
         /// <summary>
         /// Occurs when logging <see cref="Configuration" /> gets reloaded.
         /// </summary>
@@ -110,11 +110,11 @@ namespace NLog
             remove { factory.ConfigurationReloaded -= value; }
         }
 #endif
-        /// <summary>
-        /// Gets or sets a value indicating whether NLog should throw exceptions. 
-        /// By default exceptions are not thrown under any circumstances.
-        /// </summary>
-        public static bool ThrowExceptions
+		/// <summary>
+		/// Gets or sets a value indicating whether NLog should throw exceptions. 
+		/// By default exceptions are not thrown under any circumstances.
+		/// </summary>
+		public static bool ThrowExceptions
         {
             get { return factory.ThrowExceptions; }
             set { factory.ThrowExceptions = value; }
@@ -140,11 +140,11 @@ namespace NLog
             get { return currentAppDomain ?? (currentAppDomain = AppDomainWrapper.CurrentDomain); }
             set
             {
-#if !SILVERLIGHT && !MONO
+#if !SILVERLIGHT && !MONO && !UNITY
                 currentAppDomain.DomainUnload -= TurnOffLogging;
                 currentAppDomain.ProcessExit -= TurnOffLogging;
 #endif
-                currentAppDomain = value;
+				currentAppDomain = value;
             }
         }
 
@@ -273,7 +273,7 @@ namespace NLog
             factory.ReconfigExistingLoggers();
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Flush any pending log messages (in case of asynchronous targets).
         /// </summary>
@@ -301,11 +301,11 @@ namespace NLog
         }
 #endif
 
-        /// <summary>
-        /// Flush any pending log messages (in case of asynchronous targets).
-        /// </summary>
-        /// <param name="asyncContinuation">The asynchronous continuation.</param>
-        public static void Flush(AsyncContinuation asyncContinuation)
+		/// <summary>
+		/// Flush any pending log messages (in case of asynchronous targets).
+		/// </summary>
+		/// <param name="asyncContinuation">The asynchronous continuation.</param>
+		public static void Flush(AsyncContinuation asyncContinuation)
         {
             factory.Flush(asyncContinuation);
         }
@@ -378,7 +378,7 @@ namespace NLog
             }
         }
 
-#if !SILVERLIGHT && !MONO
+#if !SILVERLIGHT && !MONO && !UNITY
         private static void SetupTerminationEvents()
         {
             try
@@ -398,11 +398,11 @@ namespace NLog
         }
 #endif
 
-        /// <summary>
-        /// Gets the fully qualified name of the class invoking the LogManager, including the 
-        /// namespace but not the assembly.    
-        /// </summary>
-        private static string GetClassFullName()
+		/// <summary>
+		/// Gets the fully qualified name of the class invoking the LogManager, including the 
+		/// namespace but not the assembly.    
+		/// </summary>
+		private static string GetClassFullName()
         {
             string className;
             Type declaringType;

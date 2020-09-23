@@ -128,7 +128,7 @@ namespace NLog.LogReceiverService
 
         }
 
-        #region delegating
+#region delegating
 
         /// <summary>
         /// Causes a communication object to transition immediately from its current state into the closed state.  
@@ -272,7 +272,7 @@ namespace NLog.LogReceiverService
             remove { ProxiedClient.Closing -= value; }
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 
         /// <summary>
         /// Instructs the inner channel to display a user interface if one is required to initialize the channel prior to using it.
@@ -451,7 +451,7 @@ namespace NLog.LogReceiverService
             get { return ProxiedClient.State; }
         }
 
-        #endregion
+#endregion
 
 
         /// <summary>

@@ -37,13 +37,13 @@ namespace NLog
 {
     using System;
 
-    /// <summary>
-    /// Exception thrown during log event processing.
-    /// </summary>
-#if !SILVERLIGHT
+	/// <summary>
+	/// Exception thrown during log event processing.
+	/// </summary>
+#if !SILVERLIGHT && !UNITY
     [Serializable]
 #endif
-    public class NLogRuntimeException : Exception
+	public class NLogRuntimeException : Exception
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="NLogRuntimeException" /> class.
@@ -82,7 +82,7 @@ namespace NLog
         {
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Initializes a new instance of the <see cref="NLogRuntimeException" /> class.
         /// </summary>
@@ -99,5 +99,5 @@ namespace NLog
         {
         }
 #endif
-    }
+	}
 }

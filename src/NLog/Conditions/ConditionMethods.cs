@@ -67,18 +67,22 @@ namespace NLog.Conditions
         [System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1026:DefaultParametersShouldNotBeUsed", Justification = "Not called directly, only ever Invoked." )]
 #if SILVERLIGHT
         public static bool Equals2( string firstValue, string secondValue, [Optional] object ignoreCase)
+#elif UNITY
+		public static bool Equals2(string firstValue, string secondValue)
 #else
-        public static bool Equals2( string firstValue, string secondValue, [Optional, DefaultParameterValue(false)] bool ignoreCase)
+		public static bool Equals2( string firstValue, string secondValue, [Optional, DefaultParameterValue(false)] bool ignoreCase)
 #endif
         {
 #if SILVERLIGHT
             bool ic = false;
             if ( ignoreCase != null && ignoreCase is bool )
                 ic = ( bool ) ignoreCase;
+#elif UNITY
+            bool ic = true;
 #else
-            bool ic = ignoreCase;
+			bool ic = ignoreCase;
 #endif
-            return firstValue.Equals( secondValue, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal );
+			return firstValue.Equals( secondValue, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal );
         }
 
         /// <summary>
@@ -92,16 +96,20 @@ namespace NLog.Conditions
         [System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1026:DefaultParametersShouldNotBeUsed", Justification = "Not called directly, only ever Invoked." )]
 #if SILVERLIGHT
         public static bool Contains( string haystack, string needle, [Optional] object ignoreCase)
+#elif UNITY
+		public static bool Contains(string haystack, string needle)
 #else
-        public static bool Contains( string haystack, string needle, [Optional, DefaultParameterValue(true)] bool ignoreCase)
+		public static bool Contains( string haystack, string needle, [Optional, DefaultParameterValue(true)] bool ignoreCase)
 #endif
-        {
+		{
 #if SILVERLIGHT
             bool ic = true;
             if ( ignoreCase != null && ignoreCase is bool )
                 ic = ( bool ) ignoreCase;
+#elif UNITY
+	        bool ic = true;
 #else
-            bool ic = ignoreCase;
+			bool ic = ignoreCase;
 #endif
             return haystack.IndexOf( needle, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal ) >= 0;
         }
@@ -117,18 +125,22 @@ namespace NLog.Conditions
         [System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1026:DefaultParametersShouldNotBeUsed", Justification = "Not called directly, only ever Invoked." )]
 #if SILVERLIGHT
         public static bool StartsWith( string haystack, string needle, [Optional] object ignoreCase)
+#elif UNITY
+		public static bool StartsWith(string haystack, string needle)
 #else
-        public static bool StartsWith( string haystack, string needle, [Optional, DefaultParameterValue(true)] bool ignoreCase)
+		public static bool StartsWith( string haystack, string needle, [Optional, DefaultParameterValue(true)] bool ignoreCase)
 #endif
-        {
+		{
 #if SILVERLIGHT
             bool ic = true;
             if ( ignoreCase != null && ignoreCase is bool )
                 ic = ( bool ) ignoreCase;
+#elif UNITY
+			bool ic = true;
 #else
-            bool ic = ignoreCase;
+			bool ic = ignoreCase;
 #endif
-            return haystack.StartsWith( needle, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal );
+			return haystack.StartsWith( needle, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal );
         }
 
         /// <summary>
@@ -142,18 +154,22 @@ namespace NLog.Conditions
         [System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1026:DefaultParametersShouldNotBeUsed", Justification = "Not called directly, only ever Invoked." )]
 #if SILVERLIGHT
         public static bool EndsWith( string haystack, string needle, [Optional] object ignoreCase)
+#elif UNITY
+		public static bool EndsWith(string haystack, string needle)
 #else
-        public static bool EndsWith( string haystack, string needle, [Optional, DefaultParameterValue(true)] bool ignoreCase)
+		public static bool EndsWith( string haystack, string needle, [Optional, DefaultParameterValue(true)] bool ignoreCase)
 #endif
-        {
+		{
 #if SILVERLIGHT
             bool ic = true;
             if ( ignoreCase != null && ignoreCase is bool )
                 ic = ( bool ) ignoreCase;
+#elif UNITY
+			bool ic = true;
 #else
-            bool ic = ignoreCase;
+			bool ic = ignoreCase;
 #endif
-            return haystack.EndsWith( needle, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal );
+			return haystack.EndsWith( needle, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal );
         }
 
         /// <summary>

@@ -84,11 +84,11 @@ namespace NLog.Internal.FileAppenders
         /// </summary>
         bool ForceManaged { get; }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         /// <summary>
         /// Gets or sets the file attributes (Windows only).
         /// </summary>
         Win32FileAttributes FileAttributes { get; }
 #endif
-    }
+	}
 }
