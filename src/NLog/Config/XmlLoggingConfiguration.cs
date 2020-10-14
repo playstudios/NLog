@@ -157,9 +157,9 @@ namespace NLog.Config
 #elif UNITY
 				if (fileName.EndsWith(".xml"))
 				{
-                    if (Application.platform == RuntimePlatform.WebGLPlayer)
+                    if (Application.platform == RuntimePlatform.IPhonePlayer)
                     {
-                        var text = UnityHelper.LoadFile(fileName);
+                        var text = File.ReadAllText(fileName);
 
                         if (!string.IsNullOrEmpty(text))
                         {

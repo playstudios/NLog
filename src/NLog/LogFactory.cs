@@ -224,15 +224,29 @@ namespace NLog
 						try
 						{
                             var streamingPath = Path.Combine(UnityHelper.GetStreamingAssetPath(), nlogConfigFilename);
-                            
+
                             if (Application.platform == RuntimePlatform.WebGLPlayer)
                             {
                                 InternalLogger.Debug("StreamingAsset WebGL");
-                                
-                                LoadLoggingConfiguration(streamingPath);
+
+                                var text = UnityHelper.LoadFile(streamingPath);
+                                if (!string.IsNullOrEmpty(text))
+                                {
+                                    LoadLoggingConfiguration(streamingPath);
+                                }
+                            }
+                            else if (Application.platform == RuntimePlatform.IPhonePlayer)
+                            {
+                                InternalLogger.Debug("StreamingAsset iOS");
+
+                                var text = File.ReadAllText(streamingPath);
+                                if (!string.IsNullOrEmpty(text))
+                                {
+                                    LoadLoggingConfiguration(streamingPath);
+                                }
                             }
                             else
-                            {
+                            { 
                                 var www = new WWW(streamingPath);
                                 while (!www.isDone)
                                 {
