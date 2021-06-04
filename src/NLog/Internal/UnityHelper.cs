@@ -26,6 +26,9 @@ namespace NLog.Internal
         [DllImport("__Internal")]
         internal static extern string LoadFile(string url);
 
+        [DllImport("__Internal")]
+        internal static extern int FileExists(string url);
+
     }
 }
 

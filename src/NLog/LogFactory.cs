@@ -229,10 +229,9 @@ namespace NLog
                             {
                                 InternalLogger.Debug("StreamingAsset WebGL");
 
-                                var text = UnityHelper.LoadFile(streamingPath);
-                                if (!string.IsNullOrEmpty(text))
+                                if (UnityHelper.FileExists(streamingPath) > 0)
                                 {
-                                    LoadLoggingConfiguration(streamingPath);
+                                   LoadLoggingConfiguration(streamingPath);
                                 }
                             }
                             else if (Application.platform == RuntimePlatform.IPhonePlayer)

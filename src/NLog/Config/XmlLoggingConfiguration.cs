@@ -159,10 +159,13 @@ namespace NLog.Config
 				{
                     if (Application.platform == RuntimePlatform.WebGLPlayer)
                     {
-                        var text = UnityHelper.LoadFile(fileName);
-                        if (!string.IsNullOrEmpty(text))
+                        if (UnityHelper.FileExists(fileName) > 0)
                         {
-                            return XmlReader.Create(new StringReader(text));
+                            var text = UnityHelper.LoadFile(fileName);
+                            if (!string.IsNullOrEmpty(text))
+                            {
+                                return XmlReader.Create(new StringReader(text));
+                            }
                         }
                     }
                     else if (Application.platform == RuntimePlatform.IPhonePlayer)
