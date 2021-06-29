@@ -39,6 +39,9 @@ namespace NLog.Targets.Wrappers
     using Common;
     using Internal;
     using System.Collections.Generic;
+#if UNITY
+    using UnityEngine;
+#endif
 
     /// <summary>
     /// Provides asynchronous, buffered execution of target writes.
@@ -256,6 +259,13 @@ namespace NLog.Targets.Wrappers
             this.MergeEventProperties(logEvent.LogEvent);
             this.PrecalculateVolatileLayouts(logEvent.LogEvent);
             this.RequestQueue.Enqueue(logEvent);
+#if UNITY
+            if (Application.platform == RuntimePlatform.WebGLPlayer)
+            {
+                //Unity WebGL doesn't support System.Threading.Timer
+                ProcessPendingEvents(null);
+            }
+#endif            
         }
 
         private void ProcessPendingEvents(object state)
