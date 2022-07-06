@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -61,7 +61,7 @@ namespace NLog.Config
         public static string GetRequiredValue(this ILoggingConfigurationElement element, string attributeName, string section)
         {
             string value = element.GetOptionalValue(attributeName, null);
-            if (value == null)
+            if (value is null)
             {
                 throw new NLogConfigurationException($"Expected {attributeName} on {element.Name} in {section}");
             }
@@ -104,7 +104,7 @@ namespace NLog.Config
             }
             catch (Exception exception)
             {
-                var configException = new NLogConfigurationException(exception, $"'{attributeName}' hasn't a valid boolean value '{value}'. {defaultValue} will be used");
+                var configException = new NLogConfigurationException($"'{attributeName}' hasn't a valid boolean value '{value}'. {defaultValue} will be used", exception);
                 if (configException.MustBeRethrown())
                 {
                     throw configException;
@@ -117,7 +117,7 @@ namespace NLog.Config
         public static string GetConfigItemTypeAttribute(this ILoggingConfigurationElement element, string sectionNameForRequiredValue = null)
         {
             var typeAttributeValue = sectionNameForRequiredValue != null ? element.GetRequiredValue("type", sectionNameForRequiredValue) : element.GetOptionalValue("type", null);
-            return StripOptionalNamespacePrefix(typeAttributeValue);
+            return StripOptionalNamespacePrefix(typeAttributeValue)?.Trim();
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace NLog.Config
         /// <returns></returns>
         private static string StripOptionalNamespacePrefix(string attributeValue)
         {
-            if (attributeValue == null)
+            if (attributeValue is null)
             {
                 return null;
             }

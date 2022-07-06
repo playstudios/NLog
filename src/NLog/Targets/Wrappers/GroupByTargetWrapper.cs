@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -43,6 +43,10 @@ namespace NLog.Targets.Wrappers
     /// <summary>
     /// A target that buffers log events and sends them in batches to the wrapped target.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/GroupByWrapper-target">See NLog Wiki</a>
+    /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/GroupByWrapper-target">Documentation on NLog Wiki</seealso>
     [Target("GroupByWrapper", IsWrapper = true)]
     class GroupByTargetWrapper : WrapperTargetBase
     {
@@ -93,16 +97,16 @@ namespace NLog.Targets.Wrappers
             Key = key;
         }
 
-        // <inheritdoc />
+        /// <inheritdoc/>
         protected override void Write(AsyncLogEventInfo logEvent)
         {
             WrappedTarget.WriteAsyncLogEvent(logEvent);
         }
 
-        // <inheritdoc />
+        /// <inheritdoc/>
         protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
-            if (_buildKeyStringDelegate == null)
+            if (_buildKeyStringDelegate is null)
                 _buildKeyStringDelegate = logEvent => RenderLogEvent(Key, logEvent.LogEvent);
 
             var buckets = logEvents.BucketSort(_buildKeyStringDelegate);

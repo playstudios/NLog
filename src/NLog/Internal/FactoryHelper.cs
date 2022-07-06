@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,17 +34,12 @@
 namespace NLog.Internal
 {
     using System;
-    using System.Reflection;
 
     /// <summary>
     /// Object construction helper.
     /// </summary>
-    internal class FactoryHelper
+    internal static class FactoryHelper
     {
-        private FactoryHelper()
-        {
-        }
-
         internal static object CreateInstance(Type t)
         {
             try

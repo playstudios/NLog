@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -162,15 +162,12 @@ namespace NLog.Config
         /// </summary>
         public void Dispose()
         {
-            if (LogOutput != null)
-            {
-                LogOutput.Close();
-                LogOutput = null;
-            }
+            LogOutput?.Close();
+            LogOutput = null;
         }
 
         /// <summary>
-        /// Creates the log event which can be used to render layouts during installation/uninstallations.
+        /// Creates the log event which can be used to render layouts during install/uninstall.
         /// </summary>
         /// <returns>Log event info object.</returns>
         public LogEventInfo CreateLogEvent()
@@ -186,11 +183,11 @@ namespace NLog.Config
             return eventInfo;
         }
 
-        private void Log(LogLevel logLevel, [Localizable(false)] string message, object[] arguments)
+        private void Log(LogLevel logLevel, string message, object[] arguments)
         {
             if (logLevel >= LogLevel)
             {
-                if (arguments != null && arguments.Length > 0)
+                if (arguments?.Length > 0)
                 {
                     message = string.Format(CultureInfo.InvariantCulture, message, arguments);
                 }

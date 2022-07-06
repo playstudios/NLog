@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -45,7 +45,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("tempdir")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class TempDirLayoutRenderer : LayoutRenderer
     {
         private static string tempDir;
@@ -53,19 +52,19 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Gets or sets the name of the file to be Path.Combine()'d with the directory name.
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
+        /// <docgen category='Advanced Options' order='50' />
         public string File { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the directory to be Path.Combine()'d with the directory name.
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
+        /// <docgen category='Advanced Options' order='50' />
         public string Dir { get; set; }
 
         /// <inheritdoc/>
         protected override void InitializeLayoutRenderer()
         {
-            if (tempDir == null)
+            if (tempDir is null)
             {
                 tempDir = Path.GetTempPath();   // Can throw exception
             }
@@ -73,11 +72,7 @@ namespace NLog.LayoutRenderers
             base.InitializeLayoutRenderer();
         }
 
-        /// <summary>
-        /// Renders the directory where NLog is located and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var path = PathHelpers.CombinePaths(tempDir, Dir, File);

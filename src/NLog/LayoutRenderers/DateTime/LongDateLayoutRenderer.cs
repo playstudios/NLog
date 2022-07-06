@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
@@ -44,21 +43,15 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("longdate")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class LongDateLayoutRenderer : LayoutRenderer, IRawValue
     {
         /// <summary>
         /// Gets or sets a value indicating whether to output UTC time instead of local time.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='10' />
         public bool UniversalTime { get; set; }
 
-        /// <summary>
-        /// Renders the date in the long format (yyyy-MM-dd HH:mm:ss.ffff) and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             DateTime dt = GetValue(logEvent);

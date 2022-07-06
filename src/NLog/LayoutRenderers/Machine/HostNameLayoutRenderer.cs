@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -45,7 +45,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("hostname")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class HostNameLayoutRenderer : LayoutRenderer
     {
         private string _hostName;
@@ -81,7 +80,10 @@ namespace NLog.LayoutRenderers
         {
             return TryLookupValue(() => Environment.GetEnvironmentVariable("HOSTNAME"), "HOSTNAME")
                 ?? TryLookupValue(() => System.Net.Dns.GetHostName(), "DnsHostName")
-                ?? TryLookupValue(() => EnvironmentHelper.GetMachineName(), "MachineName");
+#if !NETSTANDARD1_3
+                ?? TryLookupValue(() => Environment.MachineName, "MachineName")
+#endif
+                ?? TryLookupValue(() => Environment.GetEnvironmentVariable("MACHINENAME"), "MachineName");
         }
 
         /// <summary>

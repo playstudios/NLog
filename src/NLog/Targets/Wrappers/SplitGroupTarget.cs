@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,18 +41,20 @@ namespace NLog.Targets.Wrappers
     /// <summary>
     /// Writes log events to all targets.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/SplitGroup-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/SplitGroup-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>This example causes the messages to be written to both file1.txt or file2.txt 
     /// </p>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/SplitGroup/NLog.config" />
     /// <p>
-    /// The above examples assume just one target and a single rule. See below for
-    /// a programmatic configuration that's equivalent to the above config file:
+    /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/SplitGroup/Simple/Example.cs" />
     /// </example>
@@ -119,7 +121,7 @@ namespace NLog.Targets.Wrappers
         /// <param name="logEvents">Logging events to be written out.</param>
         protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
-            InternalLogger.Trace("SplitGroup(Name={0}): Writing {1} events", Name, logEvents.Count);
+            InternalLogger.Trace("{0}: Writing {1} events", this, logEvents.Count);
 
             if (logEvents.Count == 1)
             {
@@ -145,12 +147,12 @@ namespace NLog.Targets.Wrappers
 
                 for (int i = 0; i < Targets.Count; ++i)
                 {
-                    InternalLogger.Trace("SplitGroup(Name={0}): Sending {1} events to {2}", Name, logEvents.Count, Targets[i]);
+                    InternalLogger.Trace("{0}: Sending {1} events to {2}", this, logEvents.Count, Targets[i]);
 
                     var targetLogEvents = logEvents;
                     if (i < Targets.Count - 1)
                     {
-                        // OptimizeBufferReuse = true, will change the input-array (so we make clones here)
+                        // WriteAsyncLogEvents will modify the input-array (so we make clones here)
                         AsyncLogEventInfo[] cloneLogEvents = new AsyncLogEventInfo[logEvents.Count];
                         logEvents.CopyTo(cloneLogEvents, 0);
                         targetLogEvents = cloneLogEvents;

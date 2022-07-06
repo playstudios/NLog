@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -39,6 +39,9 @@ namespace NLog.Config
     /// Identifies that the output of layout or layout render does not change for the lifetime of the current appdomain.
     /// </summary>
     /// <remarks>
+    ///
+    /// Implementors must have the [ThreadAgnostic] attribute
+    /// 
     /// A layout(renderer) could be converted to a literal when:
     ///  - The layout and all layout properties are SimpleLayout or [AppDomainFixedOutput]
     /// 

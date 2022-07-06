@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,8 +35,10 @@ namespace NLog
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Diagnostics;
     using System.Globalization;
+    using System.Linq;
     using System.Runtime.CompilerServices;
     using System.Security;
     using System.Text;
@@ -47,15 +49,15 @@ namespace NLog
     using NLog.Internal;
     using NLog.Internal.Fakeables;
     using NLog.Targets;
-    using System.Linq;
 
     /// <summary>
-    /// Creates and manages instances of <see cref="T:NLog.Logger" /> objects.
+    /// Creates and manages instances of <see cref="NLog.Logger" /> objects.
     /// </summary>
     public class LogFactory : IDisposable
     {
         private static readonly TimeSpan DefaultFlushTimeout = TimeSpan.FromSeconds(15);
 
+        [Obsolete("For unit testing only. Marked obsolete on NLog 5.0")]
         private static IAppDomain currentAppDomain;
         private static AppEnvironmentWrapper defaultAppEnvironment;
 
@@ -64,15 +66,14 @@ namespace NLog
         /// </remarks>
         internal readonly object _syncRoot = new object();
         private readonly LoggerCache _loggerCache = new LoggerCache();
-        private ServiceRepositoryInternal _serviceRepository = new ServiceRepositoryInternal();
+        [NotNull] private ServiceRepositoryInternal _serviceRepository = new ServiceRepositoryInternal();
         private IAppEnvironment _currentAppEnvironment;
         internal LoggingConfiguration _config;
         internal LogMessageFormatter ActiveMessageFormatter;
         internal LogMessageFormatter SingleTargetMessageFormatter;
         private LogLevel _globalThreshold = LogLevel.MinLevel;
         private bool _configLoaded;
-        // TODO: logsEnabled property might be possible to be encapsulated into LogFactory.LogsEnabler class. 
-        private int _logsEnabled;
+        private int _supendLoggingCounter;
 
         /// <summary>
         /// Overwrite possible file paths (including filename) for possible NLog config files. 
@@ -100,10 +101,9 @@ namespace NLog
         /// <summary>
         /// Initializes static members of the LogManager class.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1810:InitializeReferenceTypeStaticFieldsInline", Justification = "Significant logic in .cctor()")]
         static LogFactory()
         {
-            RegisterEvents(CurrentAppDomain);
+            RegisterEvents(DefaultAppEnvironment);
         }
 #endif
 
@@ -112,7 +112,7 @@ namespace NLog
         /// </summary>
         public LogFactory()
 #if !NETSTANDARD1_3
-            : this(new LoggingConfigurationWatchableFileLoader(DefaultAppEnvironment))  // TODO NLog 5 -Move file-watcher logic into XmlLoggingConfiguration
+            : this(new LoggingConfigurationWatchableFileLoader(DefaultAppEnvironment))  // TODO Move file-watcher logic into XmlLoggingConfiguration
 #else
             : this(new LoggingConfigurationFileLoader(DefaultAppEnvironment))
 #endif
@@ -126,6 +126,7 @@ namespace NLog
         /// </summary>
         /// <param name="config">The config.</param>
         [Obsolete("Constructor with LoggingConfiguration as parameter should not be used. Instead provide LogFactory as parameter when constructing LoggingConfiguration. Marked obsolete in NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public LogFactory(LoggingConfiguration config)
             : this()
         {
@@ -149,18 +150,23 @@ namespace NLog
         /// <summary>
         /// Gets the current <see cref="IAppDomain"/>.
         /// </summary>
+        [Obsolete("For unit testing only. Marked obsolete on NLog 5.0")]
         public static IAppDomain CurrentAppDomain
         {
             get => currentAppDomain ?? DefaultAppEnvironment.AppDomain;
             set
             {
-                UnregisterEvents(currentAppDomain);
-                //make sure we aren't double registering.
-                UnregisterEvents(value);
-                RegisterEvents(value);
+                if (defaultAppEnvironment != null)
+                    UnregisterEvents(defaultAppEnvironment);
+
                 currentAppDomain = value;
+
                 if (value != null && defaultAppEnvironment != null)
+                {
                     defaultAppEnvironment.AppDomain = value;
+                    UnregisterEvents(defaultAppEnvironment);
+                    RegisterEvents(defaultAppEnvironment);
+                }
             }
         }
 
@@ -168,13 +174,15 @@ namespace NLog
         {
             get
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 return defaultAppEnvironment ?? (defaultAppEnvironment = new AppEnvironmentWrapper(currentAppDomain ?? (currentAppDomain =
-#if NETSTANDARD1_0
-                    new FakeAppDomain()
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
                     new AppDomainWrapper(AppDomain.CurrentDomain)
+#else
+                    new FakeAppDomain()                    
 #endif
                     )));
+#pragma warning restore CS0618 // Type or member is obsolete
             }
         }
 
@@ -205,9 +213,8 @@ namespace NLog
 
         /// <summary>
         /// Gets or sets a value indicating whether Variables should be kept on configuration reload.
-        /// Default value - false.
         /// </summary>
-        public bool KeepVariablesOnReload { get; set; }
+        public bool KeepVariablesOnReload { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether to automatically call <see cref="LogFactory.Shutdown"/>
@@ -232,10 +239,11 @@ namespace NLog
         private bool _autoShutdown = true;
 
         /// <summary>
-        /// Gets or sets the current logging configuration. After setting this property all
-        /// existing loggers will be re-configured, so there is no need to call <see cref="ReconfigExistingLoggers" />
-        /// manually.
+        /// Gets or sets the current logging configuration.
         /// </summary>
+        /// <remarks>
+        /// Setter will re-configure all <see cref="Logger"/>-objects, so no need to also call <see cref="ReconfigExistingLoggers()" />
+        /// </remarks>
         public LoggingConfiguration Configuration
         {
             get
@@ -283,7 +291,7 @@ namespace NLog
 
                     _config = value;
 
-                    if (_config == null)
+                    if (_config is null)
                     {
                         _configLoaded = false;
                         _configLoader.Activated(this, _config);
@@ -301,6 +309,7 @@ namespace NLog
                             _configLoaded = true;
                         }
                     }
+
                     OnConfigurationChanged(new LoggingConfigurationChangedEventArgs(value, oldConfig));
                 }
             }
@@ -309,6 +318,7 @@ namespace NLog
         /// <summary>
         /// Repository of interfaces used by NLog to allow override for dependency injection
         /// </summary>
+        [NotNull]
         public ServiceRepository ServiceRepository
         {
             get => _serviceRepository;
@@ -320,9 +330,11 @@ namespace NLog
             }
         }
 
-        private void ServiceRepository_TypeRegistered(object sender, RepositoryUpdateEventArgs e)
+        private void ServiceRepository_TypeRegistered(object sender, ServiceRepositoryUpdateEventArgs e)
         {
-            if (e.Type == typeof(ILogMessageFormatter))
+            _config?.CheckForMissingServiceTypes(e.ServiceType);
+
+            if (e.ServiceType == typeof(ILogMessageFormatter))
             {
                 RefreshMessageFormatter();
             }
@@ -330,11 +342,11 @@ namespace NLog
 
         private void RefreshMessageFormatter()
         {
-            var messageFormatter = _serviceRepository.ResolveService<ILogMessageFormatter>();
+            var messageFormatter = _serviceRepository.GetService<ILogMessageFormatter>();
             ActiveMessageFormatter = messageFormatter.FormatMessage;
             if (messageFormatter is LogMessageTemplateFormatter templateFormatter)
             {
-                SingleTargetMessageFormatter = new LogMessageTemplateFormatter(_serviceRepository, templateFormatter.ForceTemplateRenderer, true).FormatMessage;
+                SingleTargetMessageFormatter = new LogMessageTemplateFormatter(_serviceRepository, templateFormatter.MessageTemplateParser == true, true).FormatMessage;
             }
             else
             {
@@ -353,14 +365,18 @@ namespace NLog
             {
                 lock (_syncRoot)
                 {
-                    _globalThreshold = value;
+                    if (_globalThreshold != value)
+                    {
+                        InternalLogger.Info("LogFactory GlobalThreshold changing to LogLevel: {0}", value);
+                    }
+                    _globalThreshold = value ?? LogLevel.MinLevel;
                     ReconfigExistingLoggers();
                 }
             }
         }
 
         /// <summary>
-        /// Gets the default culture info to use as <see cref="LogEventInfo.FormatProvider"/>.
+        /// Gets or sets the default culture info to use as <see cref="LogEventInfo.FormatProvider"/>.
         /// </summary>
         /// <value>
         /// Specific culture info or null to use <see cref="CultureInfo.CurrentCulture"/>
@@ -368,19 +384,22 @@ namespace NLog
         [CanBeNull]
         public CultureInfo DefaultCultureInfo
         {
-            get
+            get => _config is null ? _defaultCultureInfo : _config.DefaultCultureInfo;
+            set
             {
-                var configuration = Configuration;
-                return configuration?.DefaultCultureInfo;
+                if (_config != null && (ReferenceEquals(_config.DefaultCultureInfo, _defaultCultureInfo) || _config.DefaultCultureInfo is null))
+                    _config.DefaultCultureInfo = value;
+                _defaultCultureInfo = value;
             }
         }
+        internal CultureInfo _defaultCultureInfo;
 
         internal static void LogConfigurationInitialized()
         {
             InternalLogger.Info("Configuration initialized.");
             try
             {
-                InternalLogger.LogAssemblyVersion(typeof(ILogger).GetAssembly());
+                InternalLogger.LogAssemblyVersion(typeof(LogFactory).GetAssembly());
             }
             catch (SecurityException ex)
             {
@@ -411,7 +430,7 @@ namespace NLog
         /// </summary>
         public LogFactory Setup(Action<ISetupBuilder> setupBuilder)
         {
-            if (setupBuilder == null)
+            if (setupBuilder is null)
                 throw new ArgumentNullException(nameof(setupBuilder));
             setupBuilder(new SetupBuilder(this));
             return this;
@@ -430,15 +449,15 @@ namespace NLog
         /// Gets the logger with the full name of the current class, so namespace and class name.
         /// </summary>
         /// <returns>The logger.</returns>
-        /// <remarks>This is a slow-running method. 
-        /// Make sure you're not doing this in a loop.</remarks>
+        /// <remarks>This method introduces performance hit, because of StackTrace capture.
+        /// Make sure you are not calling this method in a loop.</remarks>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public Logger GetCurrentClassLogger()
         {
-#if NETSTANDARD1_0
-            var className = StackTraceUsageUtils.GetClassFullName();
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             var className = StackTraceUsageUtils.GetClassFullName(new StackFrame(1, false));
+#else
+            var className = StackTraceUsageUtils.GetClassFullName();       
 #endif
             return GetLogger(className);
         }
@@ -450,15 +469,15 @@ namespace NLog
         /// </summary>
         /// <returns>The logger with type <typeparamref name="T"/>.</returns>
         /// <typeparam name="T">Type of the logger</typeparam>
-        /// <remarks>This is a slow-running method. 
-        /// Make sure you're not doing this in a loop.</remarks>
+        /// <remarks>This method introduces performance hit, because of StackTrace capture.
+        /// Make sure you are not calling this method in a loop.</remarks>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public T GetCurrentClassLogger<T>() where T : Logger
+        public T GetCurrentClassLogger<T>() where T : Logger, new()
         {
-#if NETSTANDARD1_0
-            var className = StackTraceUsageUtils.GetClassFullName();
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             var className = StackTraceUsageUtils.GetClassFullName(new StackFrame(1, false));
+#else
+            var className = StackTraceUsageUtils.GetClassFullName();            
 #endif
             return (T)GetLogger(className, typeof(T));
         }
@@ -470,15 +489,15 @@ namespace NLog
         /// </summary>
         /// <param name="loggerType">The type of the logger to create. The type must inherit from <see cref="Logger"/></param>
         /// <returns>The logger of type <paramref name="loggerType"/>.</returns>
-        /// <remarks>This is a slow-running method. Make sure you are not calling this method in a 
-        /// loop.</remarks>
+        /// <remarks>This method introduces performance hit, because of StackTrace capture.
+        /// Make sure you are not calling this method in a loop.</remarks>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public Logger GetCurrentClassLogger(Type loggerType)
         {
-#if NETSTANDARD1_0
-            var className = StackTraceUsageUtils.GetClassFullName();
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             var className = StackTraceUsageUtils.GetClassFullName(new StackFrame(1, false));
+#else
+            var className = StackTraceUsageUtils.GetClassFullName();            
 #endif
             return GetLoggerThreadSafe(className, loggerType);
         }
@@ -503,7 +522,7 @@ namespace NLog
         /// <typeparam name="T">Type of the logger</typeparam>
         /// <returns>The logger reference with type <typeparamref name="T"/>. Multiple calls to <c>GetLogger</c> with the same argument 
         /// are not guaranteed to return the same logger reference.</returns>
-        public T GetLogger<T>(string name) where T : Logger
+        public T GetLogger<T>(string name) where T : Logger, new()
         {
             return (T)GetLoggerThreadSafe(name, typeof(T));
         }
@@ -522,6 +541,26 @@ namespace NLog
             return GetLoggerThreadSafe(name, loggerType);
         }
 
+        private bool RefreshExistingLoggers()
+        {
+            bool purgeObsoleteLoggers;
+            List<Logger> loggers;
+
+            lock (_syncRoot)
+            {
+                _config?.InitializeAll();
+                loggers = _loggerCache.GetLoggers();
+                purgeObsoleteLoggers = loggers.Count != _loggerCache.Count;
+            }
+
+            foreach (var logger in loggers)
+            {
+                logger.SetConfiguration(BuildLoggerConfiguration(logger.Name, _config));
+            }
+
+            return purgeObsoleteLoggers;
+        }
+
         /// <summary>
         /// Loops through all loggers previously returned by GetLogger and recalculates their 
         /// target and filter list. Useful after modifying the configuration programmatically
@@ -529,17 +568,22 @@ namespace NLog
         /// </summary>
         public void ReconfigExistingLoggers()
         {
-            List<Logger> loggers;
+            RefreshExistingLoggers();
+        }
 
-            lock (_syncRoot)
+        /// <summary>
+        /// Loops through all loggers previously returned by GetLogger and recalculates their 
+        /// target and filter list. Useful after modifying the configuration programmatically
+        /// to ensure that all loggers have been properly configured.
+        /// </summary>
+        /// <param name="purgeObsoleteLoggers">Purge garbage collected logger-items from the cache</param>
+        public void ReconfigExistingLoggers(bool purgeObsoleteLoggers)
+        {
+            purgeObsoleteLoggers = RefreshExistingLoggers() && purgeObsoleteLoggers;
+            if (purgeObsoleteLoggers)
             {
-                _config?.InitializeAll();
-                loggers = _loggerCache.GetLoggers();
-            }
-
-            foreach (var logger in loggers)
-            {
-                logger.SetConfiguration(GetConfigurationForLogger(logger.Name, _config));
+                lock (_syncRoot)
+                    _loggerCache.PurgeObsoleteLoggers();
             }
         }
 
@@ -636,7 +680,7 @@ namespace NLog
                     throw;
                 }
 
-                InternalLogger.Error(ex, "Error with flush.");
+                InternalLogger.Error(ex, "LogFactory failed to flush targets.");
                 asyncContinuation?.Invoke(ex);
             }
         }
@@ -646,12 +690,11 @@ namespace NLog
         /// </summary>
         /// <param name="loggingConfiguration">Config containing Targets to Flush</param>
         /// <param name="asyncContinuation">Flush completed notification (success / timeout)</param>
-        /// <param name="asyncTimeout">Optional timeout that guarantees that completed notication is called.</param>
+        /// <param name="asyncTimeout">Optional timeout that guarantees that completed notification is called.</param>
         /// <returns></returns>
         private static AsyncContinuation FlushAllTargetsAsync(LoggingConfiguration loggingConfiguration, AsyncContinuation asyncContinuation, TimeSpan? asyncTimeout)
         {
-            var targets = loggingConfiguration.GetAllTargetsToFlush();
-            var pendingTargets = new HashSet<Target>(targets, SingleItemOptimizedHashSet<Target>.ReferenceEqualityComparer.Default);
+            var pendingTargets = loggingConfiguration.GetAllTargetsToFlush();
 
             AsynchronousAction<Target> flushAction = (target, cont) =>
             {
@@ -690,8 +733,8 @@ namespace NLog
                 flushContinuation = AsyncHelpers.PreventMultipleCalls(flushContinuation);
             }
 
-            InternalLogger.Trace("Flushing all {0} targets...", targets.Count);
-            AsyncHelpers.ForEachItemInParallel(targets, flushContinuation, flushAction);
+            InternalLogger.Trace("Flushing all {0} targets...", pendingTargets.Count);
+            AsyncHelpers.ForEachItemInParallel(pendingTargets, flushContinuation, flushAction);
             return flushContinuation;
         }
 
@@ -716,13 +759,16 @@ namespace NLog
             }
             catch (Exception ex)
             {
+#if DEBUG
                 if (ex.MustBeRethrownImmediately())
-                    throw;
+                    throw;  // Throwing exceptions here might crash the entire application (.NET 2.0 behavior)
+#endif
+
+                InternalLogger.Error(ex, "LogFactory failed to flush targets.");
 
                 if (throwExceptions)
                     throw new NLogRuntimeException("Asynchronous exception has occurred.", ex);
 
-                InternalLogger.Error(ex, "Error with flush.");
                 return false;
             }
 
@@ -738,11 +784,11 @@ namespace NLog
         }
 
         /// <summary>
-        /// Decreases the log enable counter and if it reaches -1 the logs are disabled.
+        /// Suspends the logging, and returns object for using-scope so scope-exit calls <see cref="ResumeLogging"/>
         /// </summary>
         /// <remarks>
-        /// Logging is enabled if the number of <see cref="ResumeLogging"/> calls is greater than 
-        /// or equal to <see cref="SuspendLogging"/> calls.
+        /// Logging is suspended when the number of <see cref="SuspendLogging"/> calls are greater 
+        /// than the number of <see cref="ResumeLogging"/> calls.
         /// </remarks>
         /// <returns>An object that implements IDisposable whose Dispose() method re-enables logging. 
         /// To be used with C# <c>using ()</c> statement.</returns>
@@ -750,8 +796,8 @@ namespace NLog
         {
             lock (_syncRoot)
             {
-                _logsEnabled--;
-                if (_logsEnabled == -1)
+                _supendLoggingCounter++;
+                if (_supendLoggingCounter == 1)
                 {
                     ReconfigExistingLoggers();
                 }
@@ -761,16 +807,18 @@ namespace NLog
         }
 
         /// <summary>
-        /// Increases the log enable counter and if it reaches 0 the logs are disabled.
+        /// Resumes logging if having called <see cref="SuspendLogging"/>.
         /// </summary>
-        /// <remarks>Logging is enabled if the number of <see cref="ResumeLogging"/> calls is greater 
-        /// than or equal to <see cref="SuspendLogging"/> calls.</remarks>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="SuspendLogging"/> calls are greater 
+        /// than the number of <see cref="ResumeLogging"/> calls.
+        /// </remarks>
         public void ResumeLogging()
         {
             lock (_syncRoot)
             {
-                _logsEnabled++;
-                if (_logsEnabled == 0)
+                _supendLoggingCounter--;
+                if (_supendLoggingCounter == 0)
                 {
                     ReconfigExistingLoggers();
                 }
@@ -780,13 +828,15 @@ namespace NLog
         /// <summary>
         /// Returns <see langword="true" /> if logging is currently enabled.
         /// </summary>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="SuspendLogging"/> calls are greater 
+        /// than the number of <see cref="ResumeLogging"/> calls.
+        /// </remarks>
         /// <returns>A value of <see langword="true" /> if logging is currently enabled, 
         /// <see langword="false"/> otherwise.</returns>
-        /// <remarks>Logging is enabled if the number of <see cref="ResumeLogging"/> calls is greater 
-        /// than or equal to <see cref="SuspendLogging"/> calls.</remarks>
         public bool IsLoggingEnabled()
         {
-            return _logsEnabled >= 0;
+            return _supendLoggingCounter <= 0;
         }
 
         /// <summary>
@@ -814,101 +864,51 @@ namespace NLog
         }
 #endif
 
-        private bool GetTargetsByLevelForLogger(string name, List<LoggingRule> loggingRules, TargetWithFilterChain[] targetsByLevel, TargetWithFilterChain[] lastTargetsByLevel, bool[] suppressedLevels)
+        internal TargetWithFilterChain[] BuildLoggerConfiguration(string loggerName, LoggingConfiguration configuration)
         {
-            bool targetsFound = false;
-            foreach (LoggingRule rule in loggingRules)
+            var targetsByLevel = TargetWithFilterChain.BuildLoggerConfiguration(loggerName, configuration, IsLoggingEnabled() ? GlobalThreshold : LogLevel.Off);
+            if (InternalLogger.IsDebugEnabled && !DumpTargetConfigurationForLogger(loggerName, targetsByLevel))
             {
-                if (!rule.NameMatches(name))
-                {
-                    continue;
-                }
-
-                for (int i = 0; i <= LogLevel.MaxLevel.Ordinal; ++i)
-                {
-                    if (i < GlobalThreshold.Ordinal || suppressedLevels[i] || !rule.IsLoggingEnabledForLevel(LogLevel.FromOrdinal(i)))
-                    {
-                        continue;
-                    }
-
-                    if (rule.Final)
-                        suppressedLevels[i] = true;
-
-                    foreach (Target target in rule.GetTargetsThreadSafe())
-                    {
-                        targetsFound = true;
-                        var awf = new TargetWithFilterChain(target, rule.Filters, rule.DefaultFilterResult);
-                        if (lastTargetsByLevel[i] != null)
-                        {
-                            lastTargetsByLevel[i].NextInChain = awf;
-                        }
-                        else
-                        {
-                            targetsByLevel[i] = awf;
-                        }
-
-                        lastTargetsByLevel[i] = awf;
-                    }
-                }
-
-                // Recursively analyze the child rules.
-                if (rule.ChildRules.Count != 0)
-                {
-                    targetsFound = GetTargetsByLevelForLogger(name, rule.GetChildRulesThreadSafe(), targetsByLevel, lastTargetsByLevel, suppressedLevels) || targetsFound;
-                }
+                InternalLogger.Debug("Targets not configured for Logger: {0}", loggerName);
             }
-
-            for (int i = 0; i <= LogLevel.MaxLevel.Ordinal; ++i)
-            {
-                TargetWithFilterChain tfc = targetsByLevel[i];
-                tfc?.PrecalculateStackTraceUsage();
-            }
-
-            return targetsFound;
+            return targetsByLevel;
         }
 
-        internal LoggerConfiguration GetConfigurationForLogger(string name, LoggingConfiguration configuration)
+        private static bool DumpTargetConfigurationForLogger(string loggerName, TargetWithFilterChain[] targetsByLevel)
         {
-            TargetWithFilterChain[] targetsByLevel = new TargetWithFilterChain[LogLevel.MaxLevel.Ordinal + 1];
-            TargetWithFilterChain[] lastTargetsByLevel = new TargetWithFilterChain[LogLevel.MaxLevel.Ordinal + 1];
-            bool[] suppressedLevels = new bool[LogLevel.MaxLevel.Ordinal + 1];
+            if (ReferenceEquals(targetsByLevel, TargetWithFilterChain.NoTargetsByLevel))
+                return false;
 
-            bool targetsFound = false;
-            if (configuration != null && IsLoggingEnabled())
+            StringBuilder sb = null;
+            for (int i = 0; i <= LogLevel.MaxLevel.Ordinal; ++i)
             {
-                //no "System.InvalidOperationException: Collection was modified"
-                var loggingRules = configuration.GetLoggingRulesThreadSafe();
-                targetsFound = GetTargetsByLevelForLogger(name, loggingRules, targetsByLevel, lastTargetsByLevel, suppressedLevels);
-            }
-
-            if (InternalLogger.IsDebugEnabled)
-            {
-                if (targetsFound)
+                if (sb != null)
                 {
-                    InternalLogger.Debug("Targets for {0} by level:", name);
-                    for (int i = 0; i <= LogLevel.MaxLevel.Ordinal; ++i)
-                    {
-                        StringBuilder sb = new StringBuilder();
-                        sb.AppendFormat(CultureInfo.InvariantCulture, "{0} =>", LogLevel.FromOrdinal(i));
-                        for (TargetWithFilterChain afc = targetsByLevel[i]; afc != null; afc = afc.NextInChain)
-                        {
-                            sb.AppendFormat(CultureInfo.InvariantCulture, " {0}", afc.Target.Name);
-                            if (afc.FilterChain.Count > 0)
-                            {
-                                sb.AppendFormat(CultureInfo.InvariantCulture, " ({0} filters)", afc.FilterChain.Count);
-                            }
-                        }
+                    sb.Length = 0;
+                    sb.AppendFormat(CultureInfo.InvariantCulture, "Logger {0} [{1}] =>", loggerName, LogLevel.FromOrdinal(i));
+                }
 
-                        InternalLogger.Debug(sb.ToString());
+                for (TargetWithFilterChain afc = targetsByLevel[i]; afc != null; afc = afc.NextInChain)
+                {
+                    if (sb is null)
+                    {
+                        InternalLogger.Debug("Targets configured when LogLevel >= {0} for Logger: {1}", LogLevel.FromOrdinal(i), loggerName);
+                        sb = new StringBuilder();
+                        sb.AppendFormat(CultureInfo.InvariantCulture, "Logger {0} [{1}] =>", loggerName, LogLevel.FromOrdinal(i));
+                    }
+
+                    sb.AppendFormat(CultureInfo.InvariantCulture, " {0}", afc.Target.Name);
+                    if (afc.FilterChain.Count > 0)
+                    {
+                        sb.AppendFormat(CultureInfo.InvariantCulture, " ({0} filters)", afc.FilterChain.Count);
                     }
                 }
-                else
-                {
-                    InternalLogger.Debug("Targets not configured for logger: {0}", name);
-                }
+
+                if (sb != null)
+                    InternalLogger.Debug(sb.ToString());
             }
 
-            return new LoggerConfiguration(targetsByLevel);
+            return sb != null;
         }
 
         /// <summary>
@@ -959,13 +959,10 @@ namespace NLog
             {
                 bool attemptClose = true;
 
-#if !NETSTANDARD1_3 && !MONO
-                if (flushTimeout != TimeSpan.Zero && !PlatformDetector.IsMono && !PlatformDetector.IsUnix)
+                if (flushTimeout > TimeSpan.Zero)
                 {
-                    // MONO (and friends) have a hard time with spinning up flush threads/timers during shutdown
                     attemptClose = FlushAllTargetsSync(oldConfig, flushTimeout, false);
                 }
-#endif
 
                 // Disable all loggers, so things become quiet
                 _config = null;
@@ -984,7 +981,7 @@ namespace NLog
             }
             catch (Exception ex)
             {
-                InternalLogger.Error(ex, "Error with close.");
+                InternalLogger.Error(ex, "LogFactory failed to close NLog LoggingConfiguration.");
             }
         }
 
@@ -997,11 +994,14 @@ namespace NLog
         {
             if (disposing)
             {
-                Close(TimeSpan.Zero);
+                Close(DefaultFlushTimeout);
             }
         }
 
-        internal void Shutdown()
+        /// <summary>
+        /// Dispose all targets, and shutdown logging.
+        /// </summary>
+        public void Shutdown()
         {
             InternalLogger.Info("Shutdown() called. Logger closing...");
             if (!_isDisposing && _configLoaded)
@@ -1046,7 +1046,7 @@ namespace NLog
         }
 
         /// <summary>
-        /// Overwrite the paths (including filename) for the possible NLog config files.
+        /// Overwrite the candidates paths (including filename) for the possible NLog config files.
         /// </summary>
         /// <param name="filePaths">The file paths to the possible config file</param>
         public void SetCandidateConfigFilePaths(IEnumerable<string> filePaths)
@@ -1069,7 +1069,7 @@ namespace NLog
 
         private Logger GetLoggerThreadSafe(string name, Type loggerType)
         {
-            if (name == null)
+            if (name is null)
                 throw new ArgumentNullException(nameof(name), "Name of logger cannot be null");
 
             LoggerCacheKey cacheKey = new LoggerCacheKey(name, loggerType ?? typeof(Logger));
@@ -1084,13 +1084,18 @@ namespace NLog
                 }
 
                 Logger newLogger = CreateNewLogger(cacheKey.ConcreteType);
-                if (newLogger == null)
+                if (newLogger is null)
                 {
                     cacheKey = new LoggerCacheKey(cacheKey.Name, typeof(Logger));
                     newLogger = new Logger();
                 }
 
-                newLogger.Initialize(name, GetConfigurationForLogger(name, Configuration), this);
+                var config = _config ?? (_loggerCache.Count == 0 ? Configuration : null);   // Only force load NLog-config with first logger
+                newLogger.Initialize(name, BuildLoggerConfiguration(name, config), this);
+                if (config is null && _loggerCache.Count == 0)
+                {
+                    InternalLogger.Info("NLog Configuration has not been loaded.");
+                }
                 _loggerCache.InsertOrUpdate(cacheKey, newLogger);
                 return newLogger;
             }
@@ -1107,7 +1112,7 @@ namespace NLog
                 }
                 catch (Exception ex)
                 {
-                    InternalLogger.Error(ex, "GetLogger / GetCurrentClassLogger. Cannot create instance of type '{0}'. It should have an default contructor.", loggerType);
+                    InternalLogger.Error(ex, "GetLogger / GetCurrentClassLogger. Cannot create instance of type '{0}'. It should have an default constructor.", loggerType);
                     if (ex.MustBeRethrown())
                     {
                         throw;
@@ -1139,9 +1144,8 @@ namespace NLog
             }
             else
             {
-                var instance = ServiceRepository.GetService(customLoggerType);
-                var newLogger = instance as Logger;
-                if (newLogger == null)
+                var newLogger = ServiceRepository.GetService(customLoggerType) as Logger;
+                if (newLogger is null)
                 {
                     //well, it's not a Logger, and we should return a Logger.
                     var errorMessage =
@@ -1178,7 +1182,7 @@ namespace NLog
             }
 
             var config = _configLoader.Load(this, configFile);
-            if (config == null)
+            if (config is null)
             {
                 if (!optional)
                 {
@@ -1234,9 +1238,6 @@ namespace NLog
             /// <summary>
             /// Serves as a hash function for a particular type.
             /// </summary>
-            /// <returns>
-            /// A hash code for the current <see cref="T:System.Object"/>.
-            /// </returns>
             public override int GetHashCode()
             {
                 return ConcreteType.GetHashCode() ^ Name.GetHashCode();
@@ -1266,11 +1267,13 @@ namespace NLog
         /// <summary>
         /// Logger cache.
         /// </summary>
-        private class LoggerCache
+        private sealed class LoggerCache
         {
             // The values of WeakReferences are of type Logger i.e. Directory<LoggerCacheKey, Logger>.
             private readonly Dictionary<LoggerCacheKey, WeakReference> _loggerCache =
                     new Dictionary<LoggerCacheKey, WeakReference>();
+
+            public int Count => _loggerCache.Count;
 
             /// <summary>
             /// Inserts or updates. 
@@ -1295,12 +1298,11 @@ namespace NLog
 
             public List<Logger> GetLoggers()
             {
-                // TODO: Test if loggerCache.Values.ToList<Logger>() can be used for the conversion instead.
                 List<Logger> values = new List<Logger>(_loggerCache.Count);
 
-                foreach (WeakReference loggerReference in _loggerCache.Values)
+                foreach (var item in _loggerCache)
                 {
-                    if (loggerReference.Target is Logger logger)
+                    if (item.Value.Target is Logger logger)
                     {
                         values.Add(logger);
                     }
@@ -1308,24 +1310,42 @@ namespace NLog
 
                 return values;
             }
+
             public void Reset()
             {
                 _loggerCache.Clear();
+            }
+
+            /// <summary>
+            /// Loops through all cached loggers and removes dangling loggers that have been garbage collected.
+            /// </summary>
+            public void PurgeObsoleteLoggers()
+            {
+                foreach (var key in _loggerCache.Keys.ToList())
+                {
+                    var logger = Retrieve(key);
+                    if (logger != null)
+                        continue;
+                    _loggerCache.Remove(key);
+                }
             }
         }
 
         /// <remarks>
         /// Internal for unit tests
         /// </remarks>
-        internal void ResetLoggerCache()
+        internal int ResetLoggerCache()
         {
+            var keysCount = _loggerCache.Count;
             _loggerCache.Reset();
+            return keysCount;
         }
+
 
         /// <summary>
         /// Enables logging in <see cref="IDisposable.Dispose"/> implementation.
         /// </summary>
-        private class LogEnabler : IDisposable
+        private sealed class LogEnabler : IDisposable
         {
             private readonly LogFactory _factory;
 
@@ -1347,14 +1367,13 @@ namespace NLog
             }
         }
 
-        private static void RegisterEvents(IAppDomain appDomain)
+        private static void RegisterEvents(IAppEnvironment appEnvironment)
         {
-            if (appDomain == null) return;
+            if (appEnvironment is null) return;
 
             try
             {
-                appDomain.ProcessExit += OnLoggerShutdown;
-                appDomain.DomainUnload += OnLoggerShutdown;
+                appEnvironment.ProcessExit += OnLoggerShutdown;
             }
             catch (Exception exception)
             {
@@ -1367,12 +1386,11 @@ namespace NLog
             }
         }
 
-        private static void UnregisterEvents(IAppDomain appDomain)
+        private static void UnregisterEvents(IAppEnvironment appEnvironment)
         {
-            if (appDomain == null) return;
+            if (appEnvironment is null) return;
 
-            appDomain.DomainUnload -= OnLoggerShutdown;
-            appDomain.ProcessExit -= OnLoggerShutdown;
+            appEnvironment.ProcessExit -= OnLoggerShutdown;
         }
 
         private static void OnLoggerShutdown(object sender, EventArgs args)
@@ -1385,14 +1403,14 @@ namespace NLog
             {
                 if (ex.MustBeRethrownImmediately())
                     throw;
-                InternalLogger.Error(ex, "LogFactory failed to shut down properly.");
+                InternalLogger.Error(ex, "LogFactory failed to shutdown properly.");
             }
             finally
             {
                 LoggerShutdown = null;
-                if (currentAppDomain != null)
+                if (defaultAppEnvironment != null)
                 {
-                    CurrentAppDomain = null;    // Unregister and disconnect from AppDomain
+                    defaultAppEnvironment.ProcessExit -= OnLoggerShutdown;  // Unregister from AppDomain
                 }
             }
         }
@@ -1404,16 +1422,23 @@ namespace NLog
                 //stop timer on domain unload, otherwise: 
                 //Exception: System.AppDomainUnloadedException
                 //Message: Attempted to access an unloaded AppDomain.
-                InternalLogger.Info("AppDomain Shutting down. Logger closing...");
-                // Finalizer thread has about 2 secs, before being terminated
-                Close(TimeSpan.FromMilliseconds(1500));
-                InternalLogger.Info("Logger has been shut down.");
+                InternalLogger.Info("AppDomain Shutting down. LogFactory closing...");
+                // Domain-Unload has to complete in about 2 secs on Windows-platform, before being terminated.
+                // Other platforms like Linux will fail when trying to spin up new threads at domain unload.
+                var flushTimeout =
+#if !NETSTANDARD1_3
+                    PlatformDetector.IsWin32 ? TimeSpan.FromMilliseconds(1500) :
+#endif
+                    TimeSpan.Zero;
+                Close(flushTimeout);
+                InternalLogger.Info("LogFactory has been closed.");
             }
             catch (Exception ex)
             {
                 if (ex.MustBeRethrownImmediately())
                     throw;
-                InternalLogger.Error(ex, "Logger failed to shut down properly.");
+
+                InternalLogger.Error(ex, "LogFactory failed to close properly.");
             }
         }
     }

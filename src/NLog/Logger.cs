@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,7 +36,7 @@ namespace NLog
     using System;
     using System.Collections.Generic;
     using System.ComponentModel;
-#if NET4_5
+#if !NET35 && !NET40
     using System.Threading.Tasks;
 #endif
     using JetBrains.Annotations;
@@ -49,9 +49,9 @@ namespace NLog
     public partial class Logger : ILogger
     {
         internal static readonly Type DefaultLoggerType = typeof(Logger);
+        private TargetWithFilterChain[] _targetsByLevel = TargetWithFilterChain.NoTargetsByLevel;
         private Logger _contextLogger;
         private ThreadSafeDictionary<string, object> _contextProperties;
-        private LoggerConfiguration _configuration;
         private volatile bool _isTraceEnabled;
         private volatile bool _isDebugEnabled;
         private volatile bool _isInfoEnabled;
@@ -98,16 +98,13 @@ namespace NLog
         /// <returns>A value of <see langword="true" /> if logging is enabled for the specified level, otherwise it returns <see langword="false" />.</returns>
         public bool IsEnabled(LogLevel level)
         {
-            if (level == null)
-            {
-                throw new InvalidOperationException("Log level must be defined");
-            }
-
-            return GetTargetsForLevel(level) != null;
+            return GetTargetsForLevelSafe(level) != null;
         }
 
         /// <summary>
         /// Creates new logger that automatically appends the specified property to all log events (without changing current logger)
+        /// 
+        /// With <see cref="Properties"/> property, all properties can be enumerated. 
         /// </summary>
         /// <param name="propertyKey">Property Name</param>
         /// <param name="propertyValue">Property Value</param>
@@ -117,30 +114,45 @@ namespace NLog
             if (string.IsNullOrEmpty(propertyKey))
                 throw new ArgumentException(nameof(propertyKey));
 
-            Logger newLogger = Factory.CreateNewLogger(GetType()) ?? new Logger();
-            newLogger.Initialize(Name, _configuration, Factory);
-            newLogger._contextProperties = CreateContextPropertiesDictionary(_contextProperties);
+            Logger newLogger = CreateChildLogger();
             newLogger._contextProperties[propertyKey] = propertyValue;
-            newLogger._contextLogger = _contextLogger;  // Use the LoggerConfiguration of the parent Logger
+            return newLogger;
+        }
+
+        /// <summary>
+        /// Creates new logger that automatically appends the specified properties to all log events (without changing current logger)
+        /// 
+        /// With <see cref="Properties"/> property, all properties can be enumerated. 
+        /// </summary>
+        /// <param name="properties">Collection of key-value pair properties</param>
+        /// <returns>New Logger object that automatically appends specified properties</returns>
+        public Logger WithProperties(IEnumerable<KeyValuePair<string, object>> properties)
+        {
+            if (properties == null)
+                throw new ArgumentException(nameof(properties));
+
+            Logger newLogger = CreateChildLogger();
+            foreach (KeyValuePair<string, object> property in properties)
+            {
+                newLogger._contextProperties[property.Key] = property.Value;
+            }
             return newLogger;
         }
 
         /// <summary>
         /// Updates the specified context property for the current logger. The logger will append it for all log events.
         ///
-        /// It could be rendered with ${event-properties:YOURNAME}
-        ///
-        /// With <see cref="Properties"/> property, all properties could be changed. 
+        /// With <see cref="Properties"/> property, all properties can be enumerated (or updated). 
         /// </summary>
         /// <remarks>
-        /// Will affect all locations/contexts that makes use of the same named logger object.
+        /// It is highly recommended to ONLY use <see cref="WithProperty(string, object)"/> for modifying context properties.
+        /// This method will affect all locations/contexts that makes use of the same named logger object. And can cause
+        /// unexpected surprises at multiple locations and other thread contexts.
         /// </remarks>
         /// <param name="propertyKey">Property Name</param>
         /// <param name="propertyValue">Property Value</param>
-        /// <remarks>
-        /// It is recommended to use <see cref="WithProperty(string, object)"/> for modifying context properties
-        /// when same named logger is used at multiple locations or shared by different thread contexts.
-        /// </remarks>
+        [Obsolete("Instead use WithProperty which is safe. If really necessary then one can use Properties-property. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public void SetProperty(string propertyKey, object propertyValue)
         {
             if (string.IsNullOrEmpty(propertyKey))
@@ -158,16 +170,86 @@ namespace NLog
         }
 
         /// <summary>
+        /// Updates the <see cref="ScopeContext"/> with provided property
+        /// </summary>
+        /// <param name="propertyName">Name of property</param>
+        /// <param name="propertyValue">Value of property</param>
+        /// <returns>A disposable object that removes the properties from logical context scope on dispose.</returns>
+        /// <remarks><see cref="ScopeContext"/> property-dictionary-keys are case-insensitive</remarks>
+        public IDisposable PushScopeProperty(string propertyName, object propertyValue)
+        {
+            return ScopeContext.PushProperty(propertyName, propertyValue);
+        }
+
+        /// <summary>
+        /// Updates the <see cref="ScopeContext"/> with provided property
+        /// </summary>
+        /// <param name="propertyName">Name of property</param>
+        /// <param name="propertyValue">Value of property</param>
+        /// <returns>A disposable object that removes the properties from logical context scope on dispose.</returns>
+        /// <remarks><see cref="ScopeContext"/> property-dictionary-keys are case-insensitive</remarks>
+        public IDisposable PushScopeProperty<TValue>(string propertyName, TValue propertyValue)
+        {
+            return ScopeContext.PushProperty(propertyName, propertyValue);
+        }
+
+#if !NET35 && !NET40
+        /// <summary>
+        /// Updates the <see cref="ScopeContext"/> with provided properties
+        /// </summary>
+        /// <param name="scopeProperties">Properties being added to the scope dictionary</param>
+        /// <returns>A disposable object that removes the properties from logical context scope on dispose.</returns>
+        /// <remarks><see cref="ScopeContext"/> property-dictionary-keys are case-insensitive</remarks>
+        public IDisposable PushScopeProperties(IReadOnlyCollection<KeyValuePair<string, object>> scopeProperties)
+        {
+            return ScopeContext.PushProperties(scopeProperties);
+        }
+
+        /// <summary>
+        /// Updates the <see cref="ScopeContext"/> with provided properties
+        /// </summary>
+        /// <param name="scopeProperties">Properties being added to the scope dictionary</param>
+        /// <returns>A disposable object that removes the properties from logical context scope on dispose.</returns>
+        /// <remarks><see cref="ScopeContext"/> property-dictionary-keys are case-insensitive</remarks>
+        public IDisposable PushScopeProperties<TValue>(IReadOnlyCollection<KeyValuePair<string, TValue>> scopeProperties)
+        {
+            return ScopeContext.PushProperties(scopeProperties);
+        }
+#endif
+
+        /// <summary>
+        /// Pushes new state on the logical context scope stack
+        /// </summary>
+        /// <param name="nestedState">Value to added to the scope stack</param>
+        /// <returns>A disposable object that pops the nested scope state on dispose.</returns>
+        public IDisposable PushScopeNested<T>(T nestedState)
+        {
+            return ScopeContext.PushNestedState(nestedState);
+        }
+
+        /// <summary>
+        /// Pushes new state on the logical context scope stack
+        /// </summary>
+        /// <param name="nestedState">Value to added to the scope stack</param>
+        /// <returns>A disposable object that pops the nested scope state on dispose.</returns>
+        public IDisposable PushScopeNested(object nestedState)
+        {
+            return ScopeContext.PushNestedState(nestedState);
+        }
+
+        /// <summary>
         /// Writes the specified diagnostic message.
         /// </summary>
         /// <param name="logEvent">Log event.</param>
         public void Log(LogEventInfo logEvent)
         {
-            var targetsForLevel = IsEnabled(logEvent.Level) ? GetTargetsForLevel(logEvent.Level) : null;
+            var targetsForLevel = GetTargetsForLevelSafe(logEvent.Level);
             if (targetsForLevel != null)
             {
-                if (logEvent.LoggerName == null)
+                if (logEvent.LoggerName is null)
                     logEvent.LoggerName = Name;
+                if (logEvent.FormatProvider is null)
+                    logEvent.FormatProvider = Factory.DefaultCultureInfo;
                 WriteToTargets(logEvent, targetsForLevel);
             }
         }
@@ -179,11 +261,13 @@ namespace NLog
         /// <param name="logEvent">Log event.</param>
         public void Log(Type wrapperType, LogEventInfo logEvent)
         {
-            var targetsForLevel = IsEnabled(logEvent.Level) ? GetTargetsForLevel(logEvent.Level) : null;
+            var targetsForLevel = GetTargetsForLevelSafe(logEvent.Level);
             if (targetsForLevel != null)
             {
-                if (logEvent.LoggerName == null)
+                if (logEvent.LoggerName is null)
                     logEvent.LoggerName = Name;
+                if (logEvent.FormatProvider is null)
+                    logEvent.FormatProvider = Factory.DefaultCultureInfo;
                 WriteToTargets(wrapperType, logEvent, targetsForLevel);
             }
         }
@@ -203,7 +287,7 @@ namespace NLog
         {
             if (IsEnabled(level))
             {
-                WriteToTargets(level, null, value);
+                WriteToTargets(level, Factory.DefaultCultureInfo, value);
             }
         }
 
@@ -231,12 +315,12 @@ namespace NLog
         {
             if (IsEnabled(level))
             {
-                if (messageFunc == null)
+                if (messageFunc is null)
                 {
                     throw new ArgumentNullException(nameof(messageFunc));
                 }
 
-                WriteToTargets(level, null, messageFunc());
+                WriteToTargets(level, messageFunc());
             }
         }
 
@@ -248,7 +332,7 @@ namespace NLog
         /// <param name="message">A <see langword="string" /> containing format items.</param>
         /// <param name="args">Arguments to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)] string message, params object[] args)
+        public void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, params object[] args)
         {
             if (IsEnabled(level))
             {
@@ -265,7 +349,7 @@ namespace NLog
         {
             if (IsEnabled(level))
             {
-                WriteToTargets(level, null, message);
+                WriteToTargets(level, message);
             }
         }
 
@@ -276,7 +360,7 @@ namespace NLog
         /// <param name="message">A <see langword="string" /> containing format items.</param>
         /// <param name="args">Arguments to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log(LogLevel level, [Localizable(false)] string message, params object[] args)
+        public void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, params object[] args)
         {
             if (IsEnabled(level))
             {
@@ -288,11 +372,11 @@ namespace NLog
         /// Writes the diagnostic message and exception at the specified level.
         /// </summary>
         /// <param name="level">The log level.</param>
+        /// <param name="exception">An exception to be logged.</param>
         /// <param name="message">A <see langword="string" /> to be written.</param>
         /// <param name="args">Arguments to format.</param>
-        /// <param name="exception">An exception to be logged.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log(LogLevel level, Exception exception, [Localizable(false)] string message, params object[] args)
+        public void Log(LogLevel level, Exception exception, [Localizable(false)][StructuredMessageTemplate] string message, params object[] args)
         {
             if (IsEnabled(level))
             {
@@ -304,12 +388,12 @@ namespace NLog
         /// Writes the diagnostic message and exception at the specified level.
         /// </summary>
         /// <param name="level">The log level.</param>
+        /// <param name="exception">An exception to be logged.</param>
         /// <param name="formatProvider">An IFormatProvider that supplies culture-specific formatting information.</param>
         /// <param name="message">A <see langword="string" /> to be written.</param>
         /// <param name="args">Arguments to format.</param>
-        /// <param name="exception">An exception to be logged.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log(LogLevel level, Exception exception, IFormatProvider formatProvider, [Localizable(false)] string message, params object[] args)
+        public void Log(LogLevel level, Exception exception, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, params object[] args)
         {
             if (IsEnabled(level))
             {
@@ -326,7 +410,7 @@ namespace NLog
         /// <param name="message">A <see langword="string" /> containing one format item.</param>
         /// <param name="argument">The argument to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log<TArgument>(LogLevel level, IFormatProvider formatProvider, [Localizable(false)] string message, TArgument argument)
+        public void Log<TArgument>(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, TArgument argument)
         {
             if (IsEnabled(level))
             {
@@ -342,7 +426,7 @@ namespace NLog
         /// <param name="message">A <see langword="string" /> containing one format item.</param>
         /// <param name="argument">The argument to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log<TArgument>(LogLevel level, [Localizable(false)] string message, TArgument argument)
+        public void Log<TArgument>(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, TArgument argument)
         {
             if (IsEnabled(level))
             {
@@ -361,7 +445,7 @@ namespace NLog
         /// <param name="argument1">The first argument to format.</param>
         /// <param name="argument2">The second argument to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log<TArgument1, TArgument2>(LogLevel level, IFormatProvider formatProvider, [Localizable(false)] string message, TArgument1 argument1, TArgument2 argument2)
+        public void Log<TArgument1, TArgument2>(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, TArgument1 argument1, TArgument2 argument2)
         {
             if (IsEnabled(level))
             {
@@ -379,7 +463,7 @@ namespace NLog
         /// <param name="argument1">The first argument to format.</param>
         /// <param name="argument2">The second argument to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log<TArgument1, TArgument2>(LogLevel level, [Localizable(false)] string message, TArgument1 argument1, TArgument2 argument2)
+        public void Log<TArgument1, TArgument2>(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, TArgument1 argument1, TArgument2 argument2)
         {
             if (IsEnabled(level))
             {
@@ -400,7 +484,7 @@ namespace NLog
         /// <param name="argument2">The second argument to format.</param>
         /// <param name="argument3">The third argument to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log<TArgument1, TArgument2, TArgument3>(LogLevel level, IFormatProvider formatProvider, [Localizable(false)] string message, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+        public void Log<TArgument1, TArgument2, TArgument3>(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
         {
             if (IsEnabled(level))
             {
@@ -420,7 +504,7 @@ namespace NLog
         /// <param name="argument2">The second argument to format.</param>
         /// <param name="argument3">The third argument to format.</param>
         [MessageTemplateFormatMethod("message")]
-        public void Log<TArgument1, TArgument2, TArgument3>(LogLevel level, [Localizable(false)] string message, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+        public void Log<TArgument1, TArgument2, TArgument3>(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
         {
             if (IsEnabled(level))
             {
@@ -430,10 +514,6 @@ namespace NLog
 
         private LogEventInfo PrepareLogEventInfo(LogEventInfo logEvent)
         {
-            if (logEvent.FormatProvider == null)
-            {
-                logEvent.FormatProvider = Factory.DefaultCultureInfo;
-            }
             if (_contextProperties != null)
             {
                 foreach (var property in _contextProperties)
@@ -499,7 +579,7 @@ namespace NLog
             }
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         /// <summary>
         /// Logs an exception is logged at <c>Error</c> level if the provided task does not run to completion.
         /// </summary>
@@ -509,7 +589,7 @@ namespace NLog
         {
             try
             {
-                await task;
+                await task.ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -526,7 +606,7 @@ namespace NLog
         {
             try
             {
-                await task;
+                await task.ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -542,7 +622,7 @@ namespace NLog
         {
             try
             {
-                await asyncAction();
+                await asyncAction().ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -559,7 +639,7 @@ namespace NLog
         /// <returns>A task that represents the completion of the supplied task. If the supplied task ends in the <see cref="TaskStatus.RanToCompletion"/> state, the result of the new task will be the result of the supplied task; otherwise, the result of the new task will be the default value of type <typeparamref name="TResult"/>.</returns>
         public async Task<TResult> SwallowAsync<TResult>(Func<Task<TResult>> asyncFunc)
         {
-            return await SwallowAsync(asyncFunc, default(TResult));
+            return await SwallowAsync(asyncFunc, default(TResult)).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -574,7 +654,7 @@ namespace NLog
         {
             try
             {
-                return await asyncFunc();
+                return await asyncFunc().ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -584,19 +664,19 @@ namespace NLog
         }
 #endif
 
-        internal void Initialize(string name, LoggerConfiguration loggerConfiguration, LogFactory factory)
+        internal void Initialize(string name, TargetWithFilterChain[] targetsByLevel, LogFactory factory)
         {
             Name = name;
             Factory = factory;
-            SetConfiguration(loggerConfiguration);
+            SetConfiguration(targetsByLevel);
         }
 
-        private void WriteToTargets(LogLevel level, [Localizable(false)] string message, object[] args)
+        private void WriteToTargets(LogLevel level, string message, object[] args)
         {
             WriteToTargets(level, Factory.DefaultCultureInfo, message, args);
         }
 
-        private void WriteToTargets(LogLevel level, IFormatProvider formatProvider, [Localizable(false)] string message, object[] args)
+        private void WriteToTargets(LogLevel level, IFormatProvider formatProvider, string message, object[] args)
         {
             var targetsForLevel = GetTargetsForLevel(level);
             if (targetsForLevel != null)
@@ -606,14 +686,14 @@ namespace NLog
             }
         }
 
-        private void WriteToTargets(LogLevel level, IFormatProvider formatProvider, [Localizable(false)] string message)
+        private void WriteToTargets(LogLevel level, string message)
         {
             var targetsForLevel = GetTargetsForLevel(level);
             if (targetsForLevel != null)
             {
                 // please note that this overload calls the overload of LogEventInfo.Create with object[] parameter on purpose -
                 // to avoid unnecessary string.Format (in case of calling Create(LogLevel, string, IFormatProvider, object))
-                var logEvent = LogEventInfo.Create(level, Name, formatProvider, message, (object[])null);
+                var logEvent = LogEventInfo.Create(level, Name, Factory.DefaultCultureInfo, message, (object[])null);
                 WriteToTargets(logEvent, targetsForLevel);
             }
         }
@@ -628,17 +708,20 @@ namespace NLog
             }
         }
 
-        private void WriteToTargets(LogLevel level, Exception ex, [Localizable(false)] string message, object[] args)
+        private void WriteToTargets(LogLevel level, Exception ex, string message, object[] args)
         {
             var targetsForLevel = GetTargetsForLevel(level);
             if (targetsForLevel != null)
             {
-                var logEvent = LogEventInfo.Create(level, Name, ex, Factory.DefaultCultureInfo, message, args);
+                // Translate Exception with missing LogEvent message as log single value
+                var logEvent = message is null && ex != null && !(args?.Length > 0) ? 
+                    LogEventInfo.Create(level, Name, ExceptionMessageFormatProvider.Instance, ex) :
+                    LogEventInfo.Create(level, Name, ex, Factory.DefaultCultureInfo, message, args);
                 WriteToTargets(logEvent, targetsForLevel);
             }
         }
 
-        private void WriteToTargets(LogLevel level, Exception ex, IFormatProvider formatProvider, [Localizable(false)] string message, object[] args)
+        private void WriteToTargets(LogLevel level, Exception ex, IFormatProvider formatProvider, string message, object[] args)
         {
             var targetsForLevel = GetTargetsForLevel(level);
             if (targetsForLevel != null)
@@ -650,17 +733,46 @@ namespace NLog
 
         private void WriteToTargets([NotNull] LogEventInfo logEvent, [NotNull] TargetWithFilterChain targetsForLevel)
         {
-            LoggerImpl.Write(DefaultLoggerType, targetsForLevel, PrepareLogEventInfo(logEvent), Factory);
+            try
+            {
+                LoggerImpl.Write(DefaultLoggerType, targetsForLevel, PrepareLogEventInfo(logEvent), Factory);
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                if (ex.MustBeRethrownImmediately())
+                    throw;  // Throwing exceptions here might crash the entire application (.NET 2.0 behavior)
+
+#endif
+                if (Factory.ThrowExceptions || LogManager.ThrowExceptions)
+                    throw;
+
+                Common.InternalLogger.Error(ex, "Failed to write LogEvent");
+            }
         }
 
         private void WriteToTargets(Type wrapperType, [NotNull] LogEventInfo logEvent, [NotNull] TargetWithFilterChain targetsForLevel)
         {
-            LoggerImpl.Write(wrapperType ?? DefaultLoggerType, targetsForLevel, PrepareLogEventInfo(logEvent), Factory);
+            try
+            {
+                LoggerImpl.Write(wrapperType ?? DefaultLoggerType, targetsForLevel, PrepareLogEventInfo(logEvent), Factory);
+            }
+            catch (Exception ex)
+            {
+#if DEBUG
+                if (ex.MustBeRethrownImmediately())
+                    throw;  // Throwing exceptions here might crash the entire application (.NET 2.0 behavior)
+#endif
+                if (Factory.ThrowExceptions || LogManager.ThrowExceptions)
+                    throw;
+
+                Common.InternalLogger.Error(ex, "Failed to write LogEvent");
+            }
         }
 
-        internal void SetConfiguration(LoggerConfiguration newConfiguration)
+        internal void SetConfiguration(TargetWithFilterChain[] targetsByLevel)
         {
-            _configuration = newConfiguration;
+            _targetsByLevel = targetsByLevel;
 
             // pre-calculate 'enabled' flags
             _isTraceEnabled = IsEnabled(LogLevel.Trace);
@@ -673,12 +785,22 @@ namespace NLog
             OnLoggerReconfigured(EventArgs.Empty);
         }
 
+        private TargetWithFilterChain GetTargetsForLevelSafe(LogLevel level)
+        {
+            if (level is null)
+            {
+                throw new InvalidOperationException("Log level must be defined");
+            }
+
+            return GetTargetsForLevel(level);
+        }
+
         private TargetWithFilterChain GetTargetsForLevel(LogLevel level)
         {
             if (ReferenceEquals(_contextLogger, this))
-                return _configuration.GetTargetsForLevel(level);
+                return _targetsByLevel[level.Ordinal];
             else
-                return _contextLogger.GetTargetsForLevel(level);    // Use the LoggerConfiguration of the parent Logger
+                return _contextLogger.GetTargetsForLevel(level);    // Use the GetTargetsForLevel() of the parent Logger
         }
 
         /// <summary>
@@ -688,6 +810,15 @@ namespace NLog
         protected virtual void OnLoggerReconfigured(EventArgs e)
         {
             LoggerReconfigured?.Invoke(this, e);
+        }
+
+        private Logger CreateChildLogger()
+        {
+            Logger newLogger = Factory.CreateNewLogger(GetType()) ?? new Logger();
+            newLogger.Initialize(Name, _targetsByLevel, Factory);
+            newLogger._contextProperties = CreateContextPropertiesDictionary(_contextProperties);
+            newLogger._contextLogger = _contextLogger;  // Use the GetTargetsForLevel() of the parent Logger
+            return newLogger;
         }
     }
 }

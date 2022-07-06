@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,12 +33,13 @@
 
 namespace NLog.UnitTests.LayoutRenderers
 {
+    using System;
     using System.Xml.Linq;
     using NLog.Config;
-    using NLog.LayoutRenderers;
     using NLog.Targets;
     using Xunit;
 
+    [Obsolete("Replaced by ScopeContext.PushProperty or Logger.PushScopeProperty using ${scopeproperty}. Marked obsolete on NLog 5.0")]
     public class MdlcLayoutRendererTests : NLogTestBase
     {
         private DebugTarget _target;

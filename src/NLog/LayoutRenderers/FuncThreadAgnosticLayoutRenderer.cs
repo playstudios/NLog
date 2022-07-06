@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -39,7 +39,6 @@ namespace NLog.LayoutRenderers
     /// <summary>
     /// A layout renderer which could have different behavior per instance by using a <see cref="Func{TResult}"/>.
     /// </summary>
-    [ThreadSafe]
     [ThreadAgnostic]
     internal class FuncThreadAgnosticLayoutRenderer : FuncLayoutRenderer
     {

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -110,7 +110,7 @@ namespace NLog.UnitTests.Targets
                 Header = "-- header --",
                 Layout = "${logger} ${message}",
                 Footer = "-- footer --",
-                Error = true,
+                StdErr = true,
             };
 
             var consoleErrorWriter = new StringWriter();
@@ -139,6 +139,31 @@ namespace NLog.UnitTests.Targets
 
             string expectedResult = string.Format("-- header --{0}Logger1 message1{0}Logger1 message2{0}Logger1 message3{0}Logger2 message4{0}Logger2 message5{0}Logger1 message6{0}-- footer --{0}", Environment.NewLine);
             Assert.Equal(expectedResult, consoleErrorWriter.ToString());
+        }
+
+        [Fact]
+        public void SetupBuilder_WriteToConsole()
+        {
+            var logFactory = new LogFactory().Setup().LoadConfiguration(c =>
+            {
+                c.ForLogger().FilterMinLevel(LogLevel.Error).WriteToConsole("${message}", stderr: true);
+            }).LogFactory;
+
+            var consoleErrorWriter = new StringWriter();
+            TextWriter oldConsoleErrorWriter = Console.Error;
+            Console.SetError(consoleErrorWriter);
+
+            try
+            {
+                logFactory.GetCurrentClassLogger().Error("Abort");
+                logFactory.GetCurrentClassLogger().Info("Continue");
+            }
+            finally
+            {
+                Console.SetError(oldConsoleErrorWriter);
+            }
+
+            Assert.Equal($"Abort{System.Environment.NewLine}", consoleErrorWriter.ToString());
         }
 
 #if !MONO
@@ -187,7 +212,7 @@ namespace NLog.UnitTests.Targets
 
 #endif
 
-#if !NET3_5 && !MONO
+#if !MONO
         [Fact]
         public void ConsoleRaceCondtionIgnoreTest()
         {
@@ -215,7 +240,7 @@ namespace NLog.UnitTests.Targets
             //             
             // Full error: 
             //   Error during session close: System.IndexOutOfRangeException: Probable I/ O race condition detected while copying memory.
-            //   The I/ O package is not thread safe by default.In multithreaded applications, 
+            //   The I/ O package is not thread safe by default. In multi-threaded applications, 
             //   a stream must be accessed in a thread-safe way, such as a thread - safe wrapper returned by TextReader's or 
             //   TextWriter's Synchronized methods.This also applies to classes like StreamWriter and StreamReader.
 

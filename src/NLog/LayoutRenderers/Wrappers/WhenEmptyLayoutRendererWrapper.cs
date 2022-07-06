@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,11 +42,9 @@ namespace NLog.LayoutRenderers.Wrappers
     /// <summary>
     /// Outputs alternative layout when the inner layout produces empty result.
     /// </summary>
-    [LayoutRenderer("when-empty")]
     [LayoutRenderer("whenEmpty")]
-    [AmbientProperty("WhenEmpty")]
+    [AmbientProperty(nameof(WhenEmpty))]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class WhenEmptyLayoutRendererWrapper : WrapperLayoutRendererBase, IRawValue, IStringValueRenderer
     {
         private bool _skipStringValueRenderer;
@@ -54,7 +52,7 @@ namespace NLog.LayoutRenderers.Wrappers
         /// <summary>
         /// Gets or sets the layout to be rendered when original layout produced empty result.
         /// </summary>
-        /// <docgen category="Transformation Options" order="10"/>
+        /// <docgen category="Layout Options" order="10"/>
         [RequiredParameter]
         public Layout WhenEmpty { get; set; }
 
@@ -69,12 +67,12 @@ namespace NLog.LayoutRenderers.Wrappers
         /// <inheritdoc/>
         protected override void RenderInnerAndTransform(LogEventInfo logEvent, StringBuilder builder, int orgLength)
         {
-            Inner.RenderAppendBuilder(logEvent, builder);
+            Inner.Render(logEvent, builder);
             if (builder.Length > orgLength)
                 return;
 
             // render WhenEmpty when the inner layout was empty
-            WhenEmpty.RenderAppendBuilder(logEvent, builder);
+            WhenEmpty.Render(logEvent, builder);
         }
 
         /// <inheritdoc/>

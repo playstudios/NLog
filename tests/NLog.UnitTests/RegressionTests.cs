@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,42 +41,26 @@ namespace NLog.UnitTests
     public class RegressionTests : NLogTestBase
     {
         [Fact]
-        public void Bug3990StackOverflowWhenUsingNLogViewerTarget()
-        {
-            // this would fail because of stack overflow in the 
-            // constructor of NLogViewerTarget
-            var config = XmlLoggingConfiguration.CreateFromXmlString(@"
-<nlog>
-  <targets>
-    <target name='viewer' type='NLogViewer' address='udp://127.0.0.1:9999' />
-  </targets>
-  <rules>
-    <logger name='*' minlevel='Debug' writeTo='viewer' />
-  </rules>
-</nlog>");
-
-            var target = config.LoggingRules[0].Targets[0] as NLogViewerTarget;
-            Assert.NotNull(target);
-        }
-
-        [Fact]
         public void Bug4655UnableToReconfigureExistingLoggers()
         {
             var debugTarget1 = new DebugTarget();
             var debugTarget2 = new DebugTarget();
 
-            SimpleConfigurator.ConfigureForTargetLogging(debugTarget1, LogLevel.Debug);
+            var logFactory = new LogFactory().Setup().LoadConfiguration(builder =>
+            {
+                builder.ForLogger().WriteTo(debugTarget1);
+            }).LogFactory;
 
-            ILogger logger = LogManager.GetLogger(Guid.NewGuid().ToString("N"));
+            var logger = logFactory.GetLogger(Guid.NewGuid().ToString("N"));
 
             logger.Info("foo");
 
             Assert.Equal(1, debugTarget1.Counter);
             Assert.Equal(0, debugTarget2.Counter);
 
-            LogManager.Configuration.AddTarget("DesktopConsole", debugTarget2);
-            LogManager.Configuration.LoggingRules.Add(new LoggingRule("*", LogLevel.Debug, debugTarget2));
-            LogManager.ReconfigExistingLoggers();
+            logFactory.Configuration.AddTarget("DesktopConsole", debugTarget2);
+            logFactory.Configuration.LoggingRules.Add(new LoggingRule("*", LogLevel.Debug, debugTarget2));
+            logFactory.ReconfigExistingLoggers();
 
             logger.Info("foo");
 
@@ -87,7 +71,7 @@ namespace NLog.UnitTests
         [Fact]
         public void Bug5965StackOverflow()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog xmlns='http://www.nlog-project.org/schemas/NLog.xsd'
       xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>
   
@@ -107,14 +91,12 @@ namespace NLog.UnitTests
     <logger name='*' minlevel='Trace' writeTo='file' />
   </rules>
 
+</nlog>").LogFactory;
 
-</nlog>
-");
-
-            var log = LogManager.GetLogger("x");
+            var log = logFactory.GetLogger("x");
             log.Fatal("Test");
 
-            LogManager.Configuration = null;
+            logFactory.Configuration = null;
         }
     }
 }

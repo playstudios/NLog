@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,8 +31,6 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System.IO;
-
 namespace NLog.UnitTests.Config
 {
     using NLog.Conditions;
@@ -43,6 +41,7 @@ namespace NLog.UnitTests.Config
     using NLog.Targets.Wrappers;
     using System;
     using System.Globalization;
+    using System.IO;
     using System.Text;
     using Xunit;
 
@@ -89,6 +88,24 @@ namespace NLog.UnitTests.Config
             Assert.NotNull(t.Layout);
             Assert.Single(l.Renderers);
             Assert.IsType<MessageLayoutRenderer>(l.Renderers[0]);
+        }
+
+        [Fact]
+        public void TargetWithLayoutHasUniqueLayout()
+        {
+            var target1 = new StructuredDebugTarget();
+            var target2 = new StructuredDebugTarget();
+            var simpleLayout1 = target1.Layout as SimpleLayout;
+            var simpleLayout2 = target2.Layout as SimpleLayout;
+
+            // Ensure the default Layout for two Targets are not reusing objects
+            // As it would cause havoc with initializing / closing lifetime-events
+            Assert.NotSame(simpleLayout1, simpleLayout2);
+            Assert.Equal(simpleLayout1.Renderers.Count, simpleLayout1.Renderers.Count);
+            for (int i = 0; i < simpleLayout1.Renderers.Count; ++i)
+            {
+                Assert.NotSame(simpleLayout1.Renderers[i], simpleLayout2.Renderers[i]);
+            }
         }
 
         [Fact]
@@ -399,6 +416,27 @@ namespace NLog.UnitTests.Config
         }
 
         [Fact]
+        public void UnnamedWrappedTargetTest()
+        {
+            LoggingConfiguration c = XmlLoggingConfiguration.CreateFromXmlString(@"
+            <nlog>
+                <targets async='true'>
+                    <target type='AsyncWrapper' name='d'>
+                        <target type='Debug' />
+                    </target>
+                </targets>
+            </nlog>");
+
+            var t = c.FindTargetByName("d") as AsyncTargetWrapper;
+            Assert.NotNull(t);
+            Assert.Equal("d", t.Name);
+
+            var wrappedTarget = t.WrappedTarget as DebugTarget;
+            Assert.NotNull(wrappedTarget);
+            Assert.Equal("d_wrapped", wrappedTarget.Name);
+        }
+
+        [Fact]
         public void DefaultTargetParametersTest()
         {
             LoggingConfiguration c = XmlLoggingConfiguration.CreateFromXmlString(@"
@@ -466,13 +504,19 @@ namespace NLog.UnitTests.Config
             Assert.NotNull(debugTarget);
             Assert.Equal("d_wrapped", debugTarget.Name);
             Assert.Equal("${level}", debugTarget.Layout.ToString());
+
+            var debugTarget2 = c.FindTargetByName<DebugTarget>("d");
+            Assert.Same(debugTarget, debugTarget2);
         }
 
         [Fact]
         public void DontThrowExceptionWhenArchiveEverySetByDefaultParameters()
         {
+            var fileName = Path.GetFileNameWithoutExtension(Path.GetTempFileName()) + ".log";
 
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            try
+            {
+                var logFactory = new LogFactory().Setup().LoadConfigurationFromXml($@"
 <nlog throwExceptions='true'>
     <targets>
         <default-target-parameters 
@@ -483,20 +527,44 @@ namespace NLog.UnitTests.Config
             archiveNumbering='Rolling'
             archiveEvery='Day' />
 
-          <target fileName='" + Path.GetFileNameWithoutExtension(Path.GetTempFileName()) + @".log'
+          <target fileName='{fileName}'
                 name = 'file'
-                type = 'File'
-                layout = '${message}' />
+                type = 'File' />
     </targets>
 
     <rules>
         <logger name='*' writeTo='file'/>
     </rules>
-</nlog> ");
+</nlog> ").LogFactory;
 
-            LogManager.Configuration = configuration;
-            LogManager.GetLogger("TestLogger").Info("DefaultFileTargetParametersTests.DontThrowExceptionWhenArchiveEverySetByDefaultParameters is true");
+                logFactory.GetLogger("TestLogger").Info("DefaultFileTargetParametersTests.DontThrowExceptionWhenArchiveEverySetByDefaultParameters is true");
+            }
+            finally
+            {
+                if (File.Exists(fileName))
+                    File.Delete(fileName);
+            }
+        }
 
+        [Fact]
+        public void DontThrowExceptionsWhenMissingRequiredParameters()
+        {
+            using (new NoThrowNLogExceptions())
+            {
+                var logFactory = new LogFactory().Setup().LoadConfigurationFromXml($@"
+<nlog>
+    <targets>
+        <target type='bufferingwrapper' name='mytarget'>
+            <target type='unknowntargettype' name='badtarget' />
+        </target>
+    </targets>
+    <rules>
+        <logger name='*' writeTo='mytarget'/>
+    </rules>
+</nlog>").LogFactory;
+
+                logFactory.GetLogger(nameof(DontThrowExceptionsWhenMissingRequiredParameters)).Info("Test");
+            }
         }
 
         [Fact]

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,8 +33,6 @@
 
 namespace NLog.LayoutRenderers
 {
-    using System;
-    using System.ComponentModel;
     using System.IO;
     using System.Text;
     using NLog.Config;
@@ -45,87 +43,64 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("callsite")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class CallSiteLayoutRenderer : LayoutRenderer, IUsesStackTrace
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="CallSiteLayoutRenderer" /> class.
-        /// </summary>
-        public CallSiteLayoutRenderer()
-        {
-            ClassName = true;
-            MethodName = true;
-            IncludeNamespace = true;
-            FileName = false;
-            IncludeSourcePath = true;
-        }
-
-        /// <summary>
         /// Gets or sets a value indicating whether to render the class name.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
-        public bool ClassName { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool ClassName { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether to render the include the namespace with <see cref="ClassName"/>.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
-        public bool IncludeNamespace { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeNamespace { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether to render the method name.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
-        public bool MethodName { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool MethodName { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether the method name will be cleaned up if it is detected as an anonymous delegate.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='10' />
         public bool CleanNamesOfAnonymousDelegates { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether the method and class names will be cleaned up if it is detected as an async continuation
         /// (everything after an await-statement inside of an async method).
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='10' />
         public bool CleanNamesOfAsyncContinuations { get; set; } = true;
 
         /// <summary>
         /// Gets or sets the number of frames to skip.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(0)]
+        /// <docgen category='Layout Options' order='10' />
         public int SkipFrames { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to render the source file name and line number.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='10' />
         public bool FileName { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to include source file path.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(true)]
-        public bool IncludeSourcePath { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeSourcePath { get; set; } = true;
 
         /// <summary>
         /// Logger should capture StackTrace, if it was not provided manually
         /// </summary>
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='10' />
         public bool CaptureStackTrace { get; set; } = true;
 
-        /// <summary>
-        /// Gets the level of stack trace information required by the implementing class.
-        /// </summary>
+        /// <inheritdoc/>
         StackTraceUsage IUsesStackTrace.StackTraceUsage
         {
             get
@@ -133,15 +108,11 @@ namespace NLog.LayoutRenderers
                 return StackTraceUsageUtils.GetStackTraceUsage(
                     FileName,
                     SkipFrames,
-                    CaptureStackTrace) | ((ClassName || IncludeNamespace) ? StackTraceUsage.WithCallSiteClassName : StackTraceUsage.None);
+                    CaptureStackTrace) | (ClassName ? StackTraceUsage.WithCallSiteClassName : StackTraceUsage.None);
             }
         }
 
-        /// <summary>
-        /// Renders the call site and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             if (logEvent.CallSiteInformation != null)
@@ -164,7 +135,7 @@ namespace NLog.LayoutRenderers
 
                         if (ClassName)
                         {
-                            builder.Append(".");
+                            builder.Append('.');
                         }
                         builder.Append(methodName);
                     }
@@ -184,7 +155,7 @@ namespace NLog.LayoutRenderers
 
         private void AppendFileName(StringBuilder builder, string fileName, int lineNumber)
         {
-            builder.Append("(");
+            builder.Append('(');
             if (IncludeSourcePath)
             {
                 builder.Append(fileName);
@@ -194,9 +165,9 @@ namespace NLog.LayoutRenderers
                 builder.Append(Path.GetFileName(fileName));
             }
 
-            builder.Append(":");
+            builder.Append(':');
             builder.AppendInvariant(lineNumber);
-            builder.Append(")");
+            builder.Append(')');
         }
     }
 }

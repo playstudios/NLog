@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -134,13 +134,13 @@ namespace NLog.MessageTemplates
 
         private void AddLiteral()
         {
-            _current = new LiteralHole(new Literal { Print = _literalLength, Skip = Zero }, default(Hole));
+            _current = new LiteralHole(new Literal(_literalLength, Zero), default(Hole));
             _literalLength = 0;
         }
 
         private void ParseTextPart()
         {
-            _literalLength = (short)SkipUntil(TextDelimiters, required: false);
+            _literalLength = SkipUntil(TextDelimiters, required: false);
         }
 
         private void ParseOpenBracketPart()
@@ -180,7 +180,7 @@ namespace NLog.MessageTemplates
         private void ParseHole(CaptureType type)
         {
             int start = _position;
-            string name = ParseName(out var position);
+            string name = ParseName(out var parameterIndex);
             int alignment = 0;
             string format = null;
             if (Peek() != '}')
@@ -195,11 +195,11 @@ namespace NLog.MessageTemplates
             }
 
             int literalSkip = _position - start + (type == CaptureType.Normal ? 1 : 2);     // Account for skipped '{', '{$' or '{@'
-            _current = new LiteralHole(new Literal { Print = _literalLength, Skip = (short)literalSkip }, new Hole(
+            _current = new LiteralHole(new Literal(_literalLength, literalSkip), new Hole(
                 name,
                 format,
                 type,
-                (short)position,
+                (short)parameterIndex,
                 (short)alignment
             ));
             _literalLength = 0;
@@ -208,29 +208,28 @@ namespace NLog.MessageTemplates
         private string ParseName(out int parameterIndex)
         {
             parameterIndex = -1;
+
             char c = Peek();
             // If the name matches /^\d+ *$/ we consider it positional
             if (c >= '0' && c <= '9')
             {
                 int start = _position;
-                int parsed = ReadInt();
+                int parsedIndex = ReadInt();
                 c = Peek();
-                if (parsed >= 0)
-                {
-                    if (c == '}' || c == ':' || c == ',')
-                    {
-                        // Non-allocating positional hole-name-parsing
-                        parameterIndex = parsed;
-                        return ParameterIndexToString(parameterIndex);
-                    }
 
-                    if (c == ' ')
-                    {
-                        SkipSpaces();
-                        c = Peek();
-                        if (c == '}' || c == ':' || c == ',')
-                            parameterIndex = parsed;
-                    }
+                if (c == '}' || c == ':' || c == ',')
+                {
+                    // Non-allocating positional hole-name-parsing
+                    parameterIndex = parsedIndex;
+                    return ParameterIndexToString(parameterIndex);
+                }
+
+                if (c == ' ')
+                {
+                    SkipSpaces();
+                    c = Peek();
+                    if (c == '}' || c == ':' || c == ',')
+                        parameterIndex = parsedIndex;
                 }
 
                 _position = start;
@@ -365,11 +364,13 @@ namespace NLog.MessageTemplates
             {
                 char c = Peek();
 
-                int digit = c - '0';
-                if (digit < 0 || digit > 9)
+                if (c < '0' || c > '9')
                 {
-                    if (x > 0 && !negative || x > 1)
-                        return negative ? -i : i;  // Found one or more digits
+                    if (x > 0 && !negative)
+                        return i;
+
+                    if (x > 1 && negative)
+                        return -i;
 
                     if (x == 0 && c == '-')
                     {
@@ -381,7 +382,7 @@ namespace NLog.MessageTemplates
                 }
 
                 _position++;
-                i = i * 10 + digit;
+                i = i * 10 + (c - '0');
             }
 
             throw new TemplateParserException("An integer is expected", _position, _template);

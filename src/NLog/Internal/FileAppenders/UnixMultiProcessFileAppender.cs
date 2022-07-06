@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -142,7 +142,7 @@ namespace NLog.Internal.FileAppenders
         /// <param name="count">The number of bytes.</param>
         public override void Write(byte[] bytes, int offset, int count)
         {
-            if (_file == null)
+            if (_file is null)
                 return;
             _file.Write(bytes, offset, count);
         }
@@ -152,7 +152,7 @@ namespace NLog.Internal.FileAppenders
         /// </summary>
         public override void Close()
         {
-            if (_file == null)
+            if (_file is null)
                 return;
 
             InternalLogger.Trace("Closing '{0}'", FileName);

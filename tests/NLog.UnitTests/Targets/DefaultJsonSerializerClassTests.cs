@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -78,6 +78,22 @@ namespace NLog.UnitTests.Targets
                 Included = new IncludedClass { IncludedString = "serialized" }
             };
             return testObject;
+        }
+
+        [Fact]
+        public void SimpleValue_RegistersSerializeAsToString_ConvertsValue()
+        {
+            var logFactory = new LogFactory();
+            logFactory.Setup().SetupSerialization(s => s.RegisterObjectTransformation<System.IO.MemoryStream>(o => o.Capacity));
+
+            var testObject = new System.IO.MemoryStream(42);
+            
+            var sb = new StringBuilder();
+            var options = new JsonSerializeOptions();
+            var jsonSerializer = new DefaultJsonSerializer(logFactory.ServiceRepository);
+            jsonSerializer.SerializeObject(testObject, sb, options);
+
+            Assert.Equal($"{testObject.Capacity}", sb.ToString());
         }
 
         [Fact]

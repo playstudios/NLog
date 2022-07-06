@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -46,7 +46,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("basedir")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class BaseDirLayoutRenderer : LayoutRenderer
     {
         private readonly string _baseDir;
@@ -62,13 +61,13 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Use base dir of current process. Alternative one can just use ${processdir}
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public bool ProcessDir { get; set; }
 
         /// <summary>
         /// Fallback to the base dir of current process, when AppDomain.BaseDirectory is Temp-Path (.NET Core 3 - Single File Publish)
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public bool FixTempDir { get; set; }
 
         /// <summary>
@@ -90,22 +89,18 @@ namespace NLog.LayoutRenderers
         }
 
         /// <summary>
-        /// Gets or sets the name of the file to be Path.Combine()'d with with the base directory.
+        /// Gets or sets the name of the file to be Path.Combine()'d with the base directory.
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
+        /// <docgen category='Advanced Options' order='50' />
         public string File { get; set; }
 
         /// <summary>
-        /// Gets or sets the name of the directory to be Path.Combine()'d with with the base directory.
+        /// Gets or sets the name of the directory to be Path.Combine()'d with the base directory.
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
+        /// <docgen category='Advanced Options' order='50' />
         public string Dir { get; set; }
 
-        /// <summary>
-        /// Renders the application base directory and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var dir = _baseDir;

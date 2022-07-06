@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Globalization;
     using System.Text;
     using NLog.Config;
@@ -45,25 +44,29 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("processtime")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class ProcessTimeLayoutRenderer : LayoutRenderer, IRawValue
     {
         /// <summary>
         /// Gets or sets a value indicating whether to output in culture invariant format
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
-        public bool Invariant { get; set; }
+        /// <docgen category='Layout Options' order='100' />
+        public bool Invariant { get => ReferenceEquals(Culture, CultureInfo.InvariantCulture); set => Culture = value ? CultureInfo.InvariantCulture : CultureInfo.CurrentCulture; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets or sets the culture used for rendering. 
+        /// </summary>
+        /// <docgen category='Layout Options' order='100' />
+        [RequiredParameter]
+        public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
+
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var ts = GetValue(logEvent);
-            var culture = Invariant ? null : GetCulture(logEvent);
+            var culture = GetCulture(logEvent, Culture);
             WritetTimestamp(builder, ts, culture);
         }
 
-        /// <inheritdoc />
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             value = GetValue(logEvent);
@@ -77,9 +80,9 @@ namespace NLog.LayoutRenderers
         {
             string timeSeparator = ":";
             string ticksSeparator = ".";
-            if (culture != null)
+            if (!ReferenceEquals(culture, CultureInfo.InvariantCulture))
             {
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
                 timeSeparator = culture.DateTimeFormat.TimeSeparator;
 #endif
                 ticksSeparator = culture.NumberFormat.NumberDecimalSeparator;

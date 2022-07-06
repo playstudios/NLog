@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -40,55 +40,73 @@ namespace NLog
     /// <summary>
     /// Defines available log levels.
     /// </summary>
+    /// <remarks>
+    /// Log levels ordered by severity:<br/>
+    /// - <see cref="LogLevel.Trace"/> (Ordinal = 0) : Most verbose level. Used for development and seldom enabled in production.<br/>
+    /// - <see cref="LogLevel.Debug"/> (Ordinal = 1) : Debugging the application behavior from internal events of interest.<br/>
+    /// - <see cref="LogLevel.Info"/>  (Ordinal = 2) : Information that highlights progress or application lifetime events.<br/>
+    /// - <see cref="LogLevel.Warn"/>  (Ordinal = 3) : Warnings about validation issues or temporary failures that can be recovered.<br/>
+    /// - <see cref="LogLevel.Error"/> (Ordinal = 4) : Errors where functionality has failed or <see cref="System.Exception"/> have been caught.<br/>
+    /// - <see cref="LogLevel.Fatal"/> (Ordinal = 5) : Most critical level. Application is about to abort.<br/>
+    /// </remarks>
     [TypeConverter(typeof(Attributes.LogLevelTypeConverter))]
-    public sealed class LogLevel : IComparable<LogLevel>, IComparable, IEquatable<LogLevel>, IConvertible
+    public sealed class LogLevel : IComparable<LogLevel>, IComparable, IEquatable<LogLevel>, IFormattable
     {
         /// <summary>
-        /// Trace log level.
+        /// Trace log level (Ordinal = 0)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
+        /// <remarks>
+        /// Most verbose level. Used for development and seldom enabled in production.
+        /// </remarks>
         public static readonly LogLevel Trace = new LogLevel("Trace", 0);
 
         /// <summary>
-        /// Debug log level.
+        /// Debug log level (Ordinal = 1)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
+        /// <remarks>
+        /// Debugging the application behavior from internal events of interest.
+        /// </remarks>
         public static readonly LogLevel Debug = new LogLevel("Debug", 1);
 
         /// <summary>
-        /// Info log level.
+        /// Info log level (Ordinal = 2)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
+        /// <remarks>
+        /// Information that highlights progress or application lifetime events.
+        /// </remarks>
         public static readonly LogLevel Info = new LogLevel("Info", 2);
 
         /// <summary>
-        /// Warn log level.
+        /// Warn log level (Ordinal = 3)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
+        /// <remarks>
+        /// Warnings about validation issues or temporary failures that can be recovered.
+        /// </remarks>
         public static readonly LogLevel Warn = new LogLevel("Warn", 3);
 
         /// <summary>
-        /// Error log level.
+        /// Error log level (Ordinal = 4)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
+        /// <remarks>
+        /// Errors where functionality has failed or <see cref="System.Exception"/> have been caught.
+        /// </remarks>
         public static readonly LogLevel Error = new LogLevel("Error", 4);
 
         /// <summary>
-        /// Fatal log level.
+        /// Fatal log level (Ordinal = 5)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
+        /// <remarks>
+        /// Most critical level. Application is about to abort.
+        /// </remarks>
         public static readonly LogLevel Fatal = new LogLevel("Fatal", 5);
 
         /// <summary>
-        /// Off log level.
+        /// Off log level (Ordinal = 6)
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LogLevel Off = new LogLevel("Off", 6);
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         private static readonly IList<LogLevel> allLevels = new List<LogLevel> { Trace, Debug, Info, Warn, Error, Fatal, Off }.AsReadOnly();
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         private static readonly IList<LogLevel> allLoggingLevels = new List<LogLevel> { Trace, Debug, Info, Warn, Error, Fatal }.AsReadOnly();
 
         /// <summary>
@@ -251,18 +269,18 @@ namespace NLog
                     return Off;
 
                 default:
-                    throw new ArgumentException("Invalid ordinal.");
+                    throw new ArgumentException($"Unknown loglevel: {ordinal.ToString()}.", nameof(ordinal));
             }
         }
 
         /// <summary>
-        /// Returns the <see cref="T:NLog.LogLevel"/> that corresponds to the supplied <see langword="string" />.
+        /// Returns the <see cref="NLog.LogLevel"/> that corresponds to the supplied <see langword="string" />.
         /// </summary>
         /// <param name="levelName">The textual representation of the log level.</param>
         /// <returns>The enumeration value.</returns>
         public static LogLevel FromString(string levelName)
         {
-            if (levelName == null)
+            if (levelName is null)
             {
                 throw new ArgumentNullException(nameof(levelName));
             }
@@ -317,7 +335,7 @@ namespace NLog
                 return Warn;    // .NET Core Microsoft Extension Logging
             }
 
-            throw new ArgumentException($"Unknown log level: {levelName}");
+            throw new ArgumentException($"Unknown log level: {levelName}", nameof(levelName));
         }
 
         /// <summary>
@@ -329,23 +347,21 @@ namespace NLog
             return _name;
         }
 
-        /// <summary>
-        /// Returns a hash code for this instance.
-        /// </summary>
-        /// <returns>
-        /// A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
-        /// </returns>
+        string IFormattable.ToString(string format, IFormatProvider formatProvider)
+        {
+            if (format is null || (!"D".Equals(format, StringComparison.OrdinalIgnoreCase)))
+                return _name;
+            else
+                return _ordinal.ToString(); // Like Enum.ToString("D")
+        }
+
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
             return _ordinal;
         }
 
-        /// <summary>
-        /// Determines whether the specified <see cref="System.Object"/> is equal to this instance.
-        /// </summary>
-        /// <param name="obj">The <see cref="System.Object"/> to compare with this instance.</param>
-        /// <returns>Value of <c>true</c> if the specified <see cref="System.Object"/> is equal to 
-        /// this instance; otherwise, <c>false</c>.</returns>
+        /// <inheritdoc/>
         public override bool Equals(object obj)
         {
             return Equals(obj as LogLevel);
@@ -391,97 +407,5 @@ namespace NLog
         {
             return _ordinal - (other ?? LogLevel.Off)._ordinal;
         }
-
-        #region Implementation of IConvertible
-
-        TypeCode IConvertible.GetTypeCode()
-        {
-            return TypeCode.Object;
-        }
-
-        byte IConvertible.ToByte(IFormatProvider provider)
-        {
-            return Convert.ToByte(_ordinal);
-        }
-
-        bool IConvertible.ToBoolean(IFormatProvider provider)
-        {
-            throw new InvalidCastException();
-        }
-
-        char IConvertible.ToChar(IFormatProvider provider)
-        {
-            return Convert.ToChar(_ordinal);
-        }
-
-        DateTime IConvertible.ToDateTime(IFormatProvider provider)
-        {
-            throw new InvalidCastException();
-        }
-
-        decimal IConvertible.ToDecimal(IFormatProvider provider)
-        {
-            return Convert.ToDecimal(_ordinal);
-        }
-
-        double IConvertible.ToDouble(IFormatProvider provider)
-        {
-            return _ordinal;
-        }
-
-        short IConvertible.ToInt16(IFormatProvider provider)
-        {
-            return Convert.ToInt16(_ordinal);
-        }
-
-        int IConvertible.ToInt32(IFormatProvider provider)
-        {
-            return Convert.ToInt32(_ordinal);
-        }
-
-        long IConvertible.ToInt64(IFormatProvider provider)
-        {
-            return Convert.ToInt64(_ordinal);
-        }
-
-        sbyte IConvertible.ToSByte(IFormatProvider provider)
-        {
-            return Convert.ToSByte(_ordinal);
-        }
-
-        float IConvertible.ToSingle(IFormatProvider provider)
-        {
-            return Convert.ToSingle(_ordinal);
-        }
-
-        string IConvertible.ToString(IFormatProvider provider)
-        {
-            return _name;
-        }
-
-        object IConvertible.ToType(Type conversionType, IFormatProvider provider)
-        {
-            if (conversionType == typeof(string))
-                return _name;
-            else
-                return Convert.ChangeType(_ordinal, conversionType, provider);
-        }
-
-        ushort IConvertible.ToUInt16(IFormatProvider provider)
-        {
-            return Convert.ToUInt16(_ordinal);
-        }
-
-        uint IConvertible.ToUInt32(IFormatProvider provider)
-        {
-            return Convert.ToUInt32(_ordinal);
-        }
-
-        ulong IConvertible.ToUInt64(IFormatProvider provider)
-        {
-            return Convert.ToUInt64(_ordinal);
-        }
-
-        #endregion
     }
 }

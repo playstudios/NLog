@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,22 +33,19 @@
 
 namespace NLog.Targets
 {
-    using System;
-
     /// <summary>
     /// Mock target - useful for testing.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/Debug-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/Debug-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Debug/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
@@ -67,7 +64,6 @@ namespace NLog.Targets
         {
             LastMessage = string.Empty;
             Counter = 0;
-            OptimizeBufferReuse = true;
         }
 
         /// <summary>
@@ -94,10 +90,7 @@ namespace NLog.Targets
         /// <docgen category='Debugging Options' order='10' />
         public string LastMessage { get; private set; }
 
-        /// <summary>
-        /// Increases the number of messages.
-        /// </summary>
-        /// <param name="logEvent">The logging event.</param>
+        /// <inheritdoc/>
         protected override void Write(LogEventInfo logEvent)
         {
             Counter++;

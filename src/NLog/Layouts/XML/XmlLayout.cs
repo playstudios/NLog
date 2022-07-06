@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,16 +33,17 @@
 
 namespace NLog.Layouts
 {
-    using System;
-    using System.ComponentModel;
     using NLog.Config;
 
     /// <summary>
     /// A specialized layout that renders XML-formatted events.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/NLog/NLog/wiki/XmlLayout">See NLog Wiki</a>
+    /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/XmlLayout">Documentation on NLog Wiki</seealso>
     [Layout("XmlLayout")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class XmlLayout : XmlElementBase
     {
         private const string DefaultRootElementName = "logevent";
@@ -55,7 +56,7 @@ namespace NLog.Layouts
         {
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         public XmlLayout(string elementName, Layout elementValue) : base(elementName, elementValue)
         {
         }
@@ -63,8 +64,7 @@ namespace NLog.Layouts
         /// <summary>
         /// Name of the root XML element
         /// </summary>
-        /// <docgen category='XML Options' order='10' />
-        [DefaultValue(DefaultRootElementName)]
+        /// <docgen category='Layout Options' order='10' />
         public string ElementName
         {
             get => base.ElementNameInternal;
@@ -74,7 +74,7 @@ namespace NLog.Layouts
         /// <summary>
         /// Value inside the root XML element
         /// </summary>
-        /// <docgen category='XML Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public Layout ElementValue
         {
             get => base.LayoutWrapper.Inner;
@@ -84,8 +84,7 @@ namespace NLog.Layouts
         /// <summary>
         /// Determines whether or not this attribute will be Xml encoded.
         /// </summary>
-        /// <docgen category='XML Options' order='100' />
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='100' />
         public bool ElementEncode
         {
             get => base.LayoutWrapper.XmlEncode;

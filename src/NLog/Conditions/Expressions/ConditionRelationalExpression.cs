@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -61,36 +61,29 @@ namespace NLog.Conditions
         /// Gets the left expression.
         /// </summary>
         /// <value>The left expression.</value>
-        public ConditionExpression LeftExpression { get; private set; }
+        public ConditionExpression LeftExpression { get; }
 
         /// <summary>
         /// Gets the right expression.
         /// </summary>
         /// <value>The right expression.</value>
-        public ConditionExpression RightExpression { get; private set; }
+        public ConditionExpression RightExpression { get; }
 
         /// <summary>
         /// Gets the relational operator.
         /// </summary>
         /// <value>The operator.</value>
-        public ConditionRelationalOperator RelationalOperator { get; private set; }
+        public ConditionRelationalOperator RelationalOperator { get; }
 
         /// <summary>
         /// Returns a string representation of the expression.
         /// </summary>
-        /// <returns>
-        /// A <see cref="T:System.String"/> that represents the condition expression.
-        /// </returns>
         public override string ToString()
         {
             return $"({LeftExpression} {GetOperatorString()} {RightExpression})";
         }
 
-        /// <summary>
-        /// Evaluates the expression.
-        /// </summary>
-        /// <param name="context">Evaluation context.</param>
-        /// <returns>Expression result.</returns>
+        /// <inheritdoc/>
         protected override object EvaluateNode(LogEventInfo context)
         {
             object v1 = LeftExpression.Evaluate(context);
@@ -108,7 +101,7 @@ namespace NLog.Conditions
         /// <returns>Result of the given relational operator.</returns>
         private static bool Compare(object leftValue, object rightValue, ConditionRelationalOperator relationalOperator)
         {
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             System.Collections.IComparer comparer = StringComparer.InvariantCulture;
 #else
             System.Collections.IComparer comparer = StringComparer.Ordinal;
@@ -140,13 +133,13 @@ namespace NLog.Conditions
         }
         
         /// <summary>
-        /// Promote values to the type needed for the comparision, e.g. parse a string to int.
+        /// Promote values to the type needed for the comparison, e.g. parse a string to int.
         /// </summary>
         /// <param name="leftValue"></param>
         /// <param name="rightValue"></param>
         private static void PromoteTypes(ref object leftValue, ref object rightValue)
         {
-            if (ReferenceEquals(leftValue, rightValue) || leftValue == null || rightValue == null)
+            if (ReferenceEquals(leftValue, rightValue) || leftValue is null || rightValue is null)
             {
                 return;
             }
@@ -227,16 +220,23 @@ namespace NLog.Conditions
                     return true;
                 }
 
+                if (type1 == typeof(LogLevel))
+                {
+                    string strval = Convert.ToString(val, CultureInfo.InvariantCulture);
+                    val = LogLevel.FromString(strval);
+                    return true;
+                }
+
                 if (type1 == typeof(string))
                 {
                     val = Convert.ToString(val, CultureInfo.InvariantCulture);
-                    InternalLogger.Debug("Using string comparision");
+                    InternalLogger.Debug("Using string comparison");
                     return true;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                InternalLogger.Debug("conversion of {0} to {1} failed", val, type1.Name);
+                InternalLogger.Debug("conversion of {0} to {1} failed - {2}", val, type1.Name, ex.Message);
             }
             return false;
         }
@@ -252,7 +252,7 @@ namespace NLog.Conditions
         }
 
         /// <summary>
-        /// Get the order for the type for comparision.
+        /// Get the order for the type for comparison.
         /// </summary>
         /// <param name="type1"></param>
         /// <returns>index, 0 to max int. Lower is first</returns>
@@ -288,6 +288,7 @@ namespace NLog.Conditions
                 typeof(long),
                 typeof(int),
                 typeof(bool),
+                typeof(LogLevel),
                 typeof(string),
             };
 

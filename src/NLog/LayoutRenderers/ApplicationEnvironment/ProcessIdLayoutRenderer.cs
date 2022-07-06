@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -46,7 +46,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("processid")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class ProcessIdLayoutRenderer : LayoutRenderer, IRawValue
     {
         private readonly int _processId;
@@ -67,13 +66,12 @@ namespace NLog.LayoutRenderers
             _processId = appEnvironment.CurrentProcessId;
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             builder.AppendInvariant(_processId);
         }
 
-        /// <inheritdoc />
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             value = _processId;

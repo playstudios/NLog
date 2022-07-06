@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -45,13 +45,15 @@ namespace NLog.Targets
         public static bool IsConsoleAvailable(out string reason)
         {
             reason = string.Empty;
-#if !MONO && !NETSTANDARD1_0
+#if !MONO && !NETSTANDARD1_3 && !NETSTANDARD1_5
             try
             {
                 if (!Environment.UserInteractive)
                 {
+#if !NETSTANDARD
                     if (Internal.PlatformDetector.IsMono && Console.In is StreamReader)
                         return true;    // Extra bonus check for Mono, that doesn't support Environment.UserInteractive
+#endif
 
                     reason = "Environment.UserInteractive = False";
                     return false;
@@ -79,7 +81,7 @@ namespace NLog.Targets
                 return currentEncoding;
             else if ((isInitialized && !pauseLogging) || IsConsoleAvailable(out _))
                 return Console.OutputEncoding;
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_5
             return Encoding.Default;
 #else
             return currentEncoding;

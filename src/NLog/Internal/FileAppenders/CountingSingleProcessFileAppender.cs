@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,7 +36,6 @@ namespace NLog.Internal.FileAppenders
     using System;
     using System.IO;
     using System.Security;
-    using NLog.Common;
 
     /// <summary>
     /// Implementation of <see cref="BaseFileAppender"/> which caches 
@@ -50,7 +49,7 @@ namespace NLog.Internal.FileAppenders
         private FileStream _file;
         private long _currentFileLength;
         private readonly bool _enableFileDeleteSimpleMonitor;
-        private DateTime _lastSimpleMonitorCheckTimeUtc;
+        private int _lastSimpleMonitorCheckTickCount;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CountingSingleProcessFileAppender" /> class.
@@ -64,7 +63,7 @@ namespace NLog.Internal.FileAppenders
             _currentFileLength = fileInfo.Exists ? fileInfo.Length : 0;
             _file = CreateFileStream(false);
             _enableFileDeleteSimpleMonitor = parameters.EnableFileDeleteSimpleMonitor;
-            _lastSimpleMonitorCheckTimeUtc = OpenTimeUtc;
+            _lastSimpleMonitorCheckTickCount = Environment.TickCount;
         }
 
         /// <summary>
@@ -72,25 +71,7 @@ namespace NLog.Internal.FileAppenders
         /// </summary>
         public override void Close()
         {
-            if (_file != null)
-            {
-                InternalLogger.Trace("Closing '{0}'", FileName);
-
-                try
-                {
-                    _file.Close();
-                }
-                catch (Exception ex)
-                {
-                    // Swallow exception as the file-stream now is in final state (broken instead of closed)
-                    InternalLogger.Warn(ex, "Failed to close file: '{0}'", FileName);
-                    AsyncHelpers.WaitForDelay(TimeSpan.FromMilliseconds(1));    // Artificial delay to avoid hammering a bad file location
-                }
-                finally
-                {
-                    _file = null;
-                }
-            }
+            CloseFileSafe(ref _file, FileName);
         }
 
         /// <summary>
@@ -98,7 +79,7 @@ namespace NLog.Internal.FileAppenders
         /// </summary>
         public override void Flush()
         {
-            if (_file == null)
+            if (_file is null)
             {
                 return;
             }
@@ -133,14 +114,14 @@ namespace NLog.Internal.FileAppenders
         /// <param name="count">The number of bytes.</param>
         public override void Write(byte[] bytes, int offset, int count)
         {
-            if (_file == null)
+            if (_file is null)
             {
                 return;
             }
 
-            if (_enableFileDeleteSimpleMonitor && MonitorForEnableFileDeleteEvent(FileName, ref _lastSimpleMonitorCheckTimeUtc))
+            if (_enableFileDeleteSimpleMonitor && MonitorForEnableFileDeleteEvent(FileName, ref _lastSimpleMonitorCheckTickCount))
             {
-                _file.Dispose();
+                CloseFileSafe(ref _file, FileName);
                 _file = CreateFileStream(false);
                 _currentFileLength = _file.Length;
             }

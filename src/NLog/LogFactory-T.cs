@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,7 +42,7 @@ namespace NLog
     /// <remarks>Use this only when a custom Logger type is defined.</remarks>
     /// <typeparam name="T">The type of the logger to be returned. Must inherit from <see cref="Logger"/>.</typeparam>
     public class LogFactory<T> : LogFactory 
-        where T : Logger
+        where T : Logger, new()
     {
         /// <summary>
         /// Gets the logger with type <typeparamref name="T"/>.
@@ -60,14 +60,13 @@ namespace NLog
         /// <returns>An instance of <typeparamref name="T"/>.</returns>
         /// <remarks>This is a slow-running method. 
         /// Make sure you're not doing this in a loop.</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1024:UsePropertiesWhereAppropriate", Justification = "Backwards compatibility")]
         [MethodImpl(MethodImplOptions.NoInlining)]
         public new T GetCurrentClassLogger()
         {
-#if NETSTANDARD1_0
-            var className = Internal.StackTraceUsageUtils.GetClassFullName();
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             var className = Internal.StackTraceUsageUtils.GetClassFullName(new StackFrame(1, false));
+#else
+            var className = Internal.StackTraceUsageUtils.GetClassFullName();            
 #endif
             return GetLogger(className);
         }

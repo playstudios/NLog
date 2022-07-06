@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -48,9 +48,9 @@ namespace NLog.MessageTemplates
     internal class ValueFormatter : IValueFormatter
     {
         private static readonly IEqualityComparer<object> _referenceEqualsComparer = SingleItemOptimizedHashSet<object>.ReferenceEqualityComparer.Default;
-        private readonly MruCache<Enum, string> _enumCache = new MruCache<Enum, string>(1500);
+        private readonly MruCache<Enum, string> _enumCache = new MruCache<Enum, string>(2000);
         private readonly IServiceProvider _serviceProvider;
-        private IJsonConverter JsonConverter => _jsonConverter ?? (_jsonConverter = _serviceProvider.ResolveService<IJsonConverter>());
+        private IJsonConverter JsonConverter => _jsonConverter ?? (_jsonConverter = _serviceProvider.GetService<IJsonConverter>());
         private IJsonConverter _jsonConverter;
 
         public ValueFormatter([NotNull] IServiceProvider serviceProvider)
@@ -131,7 +131,7 @@ namespace NLog.MessageTemplates
                 return true;
             }
 
-            if (value == null)
+            if (value is null)
             {
                 builder.Append("NULL");
                 return true;
@@ -207,7 +207,7 @@ namespace NLog.MessageTemplates
                         }
                         else
                         {
-                            builder.AppendIntegerAsString(value, convertibleTypeCode);
+                            builder.AppendNumericInvariant(value, convertibleTypeCode);
                         }
                         break;
                     }
@@ -276,7 +276,7 @@ namespace NLog.MessageTemplates
         /// "FirstOrder"=true, "Previous login"=20-12-2017 14:55:32, "number of tries"=1
         /// </example>
         /// <param name="dictionary"></param>
-        /// <param name="format">formatstring of an item</param>
+        /// <param name="format">format string of an item</param>
         /// <param name="formatProvider"></param>
         /// <param name="builder"></param>
         /// <param name="objectsInPath"></param>

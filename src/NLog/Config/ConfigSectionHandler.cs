@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -61,8 +61,7 @@ namespace NLog.Config
         {
             try
             {
-                string configFileName = AppDomainWrapper.CurrentDomain.ConfigurationFile;
-
+                string configFileName = LogFactory.DefaultAppEnvironment.AppDomainConfigurationFile;
                 _config = new XmlLoggingConfiguration(reader, configFileName, LogManager.LogFactory);
             }
             catch (Exception exception)

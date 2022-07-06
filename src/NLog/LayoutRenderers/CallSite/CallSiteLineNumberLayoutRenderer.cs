@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,8 +31,6 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using System.ComponentModel;
 using System.Text;
 using NLog.Config;
 using NLog.Internal;
@@ -44,28 +42,24 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("callsite-linenumber")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class CallSiteLineNumberLayoutRenderer : LayoutRenderer, IUsesStackTrace, IRawValue
     {
         /// <summary>
         /// Gets or sets the number of frames to skip.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(0)]
+        /// <docgen category='Layout Options' order='10' />
         public int SkipFrames { get; set; }
 
         /// <summary>
         /// Logger should capture StackTrace, if it was not provided manually
         /// </summary>
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='10' />
         public bool CaptureStackTrace { get; set; } = true;
 
-        /// <summary>
-        /// Gets the level of stack trace information required by the implementing class.
-        /// </summary>
+        /// <inheritdoc/>
         StackTraceUsage IUsesStackTrace.StackTraceUsage => StackTraceUsageUtils.GetStackTraceUsage(true, SkipFrames, CaptureStackTrace);
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var lineNumber = GetLineNumber(logEvent);
@@ -73,7 +67,6 @@ namespace NLog.LayoutRenderers
                 builder.AppendInvariant(lineNumber.Value);
         }
 
-        /// <inheritdoc />
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             value = GetLineNumber(logEvent);
@@ -82,7 +75,7 @@ namespace NLog.LayoutRenderers
 
         private int? GetLineNumber(LogEventInfo logEvent)
         {
-            if (logEvent.CallSiteInformation == null)
+            if (logEvent.CallSiteInformation is null)
             {
                 return null;
             }

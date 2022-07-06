@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
@@ -51,22 +50,12 @@ namespace NLog.LayoutRenderers
     /// </remarks>
     [LayoutRenderer("assembly-version")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class AssemblyVersionLayoutRenderer : LayoutRenderer
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AssemblyVersionLayoutRenderer" /> class.
-        /// </summary>
-        public AssemblyVersionLayoutRenderer()
-        {
-            Type = AssemblyVersionType.Assembly;
-            Format = DefaultFormat;
-        }
-
-        /// <summary>
         /// The (full) name of the assembly. If <c>null</c>, using the entry assembly.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [DefaultParameter]
         public string Name { get; set; }
 
@@ -77,13 +66,15 @@ namespace NLog.LayoutRenderers
         /// Some version type and platform combinations are not fully supported.
         /// - UWP earlier than .NET Standard 1.5: Value for <see cref="AssemblyVersionType.Assembly"/> is always returned unless the <see cref="Name"/> parameter is specified.
         /// </remarks>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(nameof(AssemblyVersionType.Assembly))]
-        public AssemblyVersionType Type { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public AssemblyVersionType Type { get; set; } = AssemblyVersionType.Assembly;
 
-        private const string DefaultFormat = "major.minor.build.revision";
-
-        private string _format;
+        ///<summary>
+        /// The default value to render if the Version is not available
+        ///</summary>
+        /// <docgen category='Layout Options' order='10' />
+        public string Default { get => _default ?? GenerateDefaultValue(); set => _default = value; }
+        private string _default;
 
         /// <summary>
         /// Gets or sets the custom format of the assembly version output.
@@ -94,26 +85,24 @@ namespace NLog.LayoutRenderers
         /// https://docs.microsoft.com/en-gb/dotnet/api/system.version?view=netframework-4.7.2#remarks
         /// for details.
         /// </remarks>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(DefaultFormat)]
+        /// <docgen category='Layout Options' order='10' />
         public string Format
         {
             get => _format;
-            set => _format = value?.ToLowerInvariant();
+            set => _format = value?.ToLowerInvariant() ?? string.Empty;
         }
+        private string _format = DefaultFormat;
 
-        /// <summary>
-        /// Initializes the layout renderer.
-        /// </summary>
+        private const string DefaultFormat = "major.minor.build.revision";
+
+        /// <inheritdoc/>
         protected override void InitializeLayoutRenderer()
         {
             _assemblyVersion = null;
             base.InitializeLayoutRenderer();
         }
 
-        /// <summary>
-        /// Closes the layout renderer.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void CloseLayoutRenderer()
         {
             _assemblyVersion = null;
@@ -122,25 +111,30 @@ namespace NLog.LayoutRenderers
 
         private string _assemblyVersion;
 
-        /// <summary>
-        /// Renders an assembly version and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var version = _assemblyVersion ?? (_assemblyVersion = ApplyFormatToVersion(GetVersion()));
-
-            if (string.IsNullOrEmpty(version))
-            {
-                version = $"Could not find value for {(string.IsNullOrEmpty(Name) ? "entry" : Name)} assembly and version type {Type}";
-            }
-
+            if (version is null)
+                version = GenerateDefaultValue();
             builder.Append(version);
         }
 
         private string ApplyFormatToVersion(string version)
         {
+            if (version is null)
+            {
+                return _default;
+            }
+            else if (StringHelpers.IsNullOrWhiteSpace(version))
+            {
+                return _default ?? GenerateDefaultValue();
+            }
+            else if (version == "0.0.0.0" && _default != null)
+            {
+                return _default;
+            }
+
             if (Format.Equals(DefaultFormat, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(version))
             {
                 return version;
@@ -153,6 +147,11 @@ namespace NLog.LayoutRenderers
                 .Replace("revision", versionParts.Length > 3 ? versionParts[3] : "0");
 
             return version;
+        }
+
+        private string GenerateDefaultValue()
+        {
+            return $"Could not find value for {(string.IsNullOrEmpty(Name) ? "entry" : Name)} assembly and version type {Type}";
         }
 
 #if NETSTANDARD1_3
@@ -179,8 +178,18 @@ namespace NLog.LayoutRenderers
 
         private string GetVersion()
         {
-            var assembly = GetAssembly();
-            return GetVersion(assembly);
+            try
+            {
+                var assembly = GetAssembly();
+                return GetVersion(assembly) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                NLog.Common.InternalLogger.Warn(ex, "${assembly-version} - Failed to load assembly {0}", Name);
+                if (ex.MustBeRethrown())
+                    throw;
+                return null;
+            }
         }
 
         /// <summary>

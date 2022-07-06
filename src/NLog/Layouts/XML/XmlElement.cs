@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,11 +31,10 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System.ComponentModel;
-using NLog.Config;
-
 namespace NLog.Layouts
 {
+    using NLog.Config;
+
     /// <summary>
     /// A XML Element
     /// </summary>
@@ -44,12 +43,12 @@ namespace NLog.Layouts
     {
         private const string DefaultElementName = "item";
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         public XmlElement() : this(DefaultElementName, null)
         {
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         public XmlElement(string elementName, Layout elementValue) : base(elementName, elementValue)
         {
         }
@@ -57,8 +56,7 @@ namespace NLog.Layouts
         /// <summary>
         /// Name of the element
         /// </summary>
-        /// <docgen category='Element Options' order='10' />
-        [DefaultValue(DefaultElementName)]
+        /// <docgen category='Layout Options' order='1' />
         public string Name
         {
             get => base.ElementNameInternal;
@@ -68,7 +66,7 @@ namespace NLog.Layouts
         /// <summary>
         /// Value inside the element
         /// </summary>
-        /// <docgen category='Element Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public Layout Value
         {
             get => base.LayoutWrapper.Inner;
@@ -76,10 +74,9 @@ namespace NLog.Layouts
         }
 
         /// <summary>
-        /// Determines whether or not this attribute will be Xml encoded.
+        /// Gets or sets whether output should be encoded with Xml-string escaping, or be treated as valid xml-element-value
         /// </summary>
-        /// <docgen category='Element Options' order='10' />
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='50' />
         public bool Encode
         {
             get => base.LayoutWrapper.XmlEncode;

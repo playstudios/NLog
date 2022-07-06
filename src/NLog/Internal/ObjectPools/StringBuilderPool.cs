@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -67,7 +67,7 @@ namespace NLog.Internal
         public ItemHolder Acquire()
         {
             StringBuilder item = _fastPool;
-            if (item == null || item != Interlocked.CompareExchange(ref _fastPool, null, item))
+            if (item is null || item != Interlocked.CompareExchange(ref _fastPool, null, item))
             {
                 for (int i = 0; i < _slowPool.Length; i++)
                 {
@@ -97,11 +97,15 @@ namespace NLog.Internal
                 int maxBuilderCapacity = poolIndex == -1 ? _maxBuilderCapacity * 10 : _maxBuilderCapacity;
                 if (stringBuilder.Length > maxBuilderCapacity)
                 {
-                    stringBuilder = new StringBuilder(maxBuilderCapacity / 2);
+                    stringBuilder.Remove(0, stringBuilder.Length - 1);  // Attempt soft clear that skips re-allocation
+                    if (stringBuilder.Capacity > maxBuilderCapacity)
+                    {
+                        stringBuilder = new StringBuilder(maxBuilderCapacity / 2);
+                    }
                 }
             }
 
-            stringBuilder.Length = 0;
+            stringBuilder.ClearBuilder();
 
             if (poolIndex == -1)
             {
@@ -134,10 +138,7 @@ namespace NLog.Internal
             /// </summary>
             public void Dispose()
             {
-                if (_owner != null)
-                {
-                    _owner.Release(Item, _poolIndex);
-                }
+                _owner?.Release(Item, _poolIndex);
             }
         }
     }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,59 +35,54 @@ namespace NLog.LayoutRenderers
 {
     using System;
     using System.Text;
-    using NLog.Config;
 
     /// <summary>
     /// <see cref="NestedDiagnosticsLogicalContext"/> Timing Renderer (Async scope)
     /// </summary>
     [LayoutRenderer("ndlctiming")]
-    [ThreadSafe]
+    [Obsolete("Replaced by ScopeContextTimingLayoutRenderer ${scopetiming}. Marked obsolete on NLog 5.0")]
     public class NdlcTimingLayoutRenderer : LayoutRenderer
     {
         /// <summary>
         /// Gets or sets whether to only include the duration of the last scope created
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public bool CurrentScope { get; set; }
 
         /// <summary>
         /// Gets or sets whether to just display the scope creation time, and not the duration
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public bool ScopeBeginTime { get; set; }
 
         /// <summary>
         /// Gets or sets the TimeSpan format. Can be any argument accepted by TimeSpan.ToString(format).
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public string Format { get; set; }
 
-        /// <summary>
-        /// Renders the timing details of the Nested Logical Context item and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
-            DateTime scopeBegin = CurrentScope ? NestedDiagnosticsLogicalContext.PeekTopScopeBeginTime() : NestedDiagnosticsLogicalContext.PeekBottomScopeBeginTime();
-            if (scopeBegin != DateTime.MinValue)
+            TimeSpan? scopeDuration = CurrentScope ? ScopeContext.PeekInnerNestedDuration() : ScopeContext.PeekOuterNestedDuration();
+            if (scopeDuration.HasValue)
             {
+                if (scopeDuration.Value < TimeSpan.Zero)
+                    scopeDuration = TimeSpan.Zero;
+
                 if (ScopeBeginTime)
                 {
                     var formatProvider = GetFormatProvider(logEvent, null);
-                    scopeBegin = Time.TimeSource.Current.FromSystemTime(scopeBegin);
+                    var scopeBegin = Time.TimeSource.Current.Time.Subtract(scopeDuration.Value);
                     builder.Append(scopeBegin.ToString(Format, formatProvider));
                 }
                 else
                 {
-                    TimeSpan duration = scopeBegin != DateTime.MinValue ? DateTime.UtcNow - scopeBegin : TimeSpan.Zero;
-                    if (duration < TimeSpan.Zero)
-                        duration = TimeSpan.Zero;
-#if !NET3_5
+#if !NET35
                     var formatProvider = GetFormatProvider(logEvent, null);
-                    builder.Append(duration.ToString(Format, formatProvider));
+                    builder.Append(scopeDuration.Value.ToString(Format, formatProvider));
 #else
-                    builder.Append(duration.ToString());
+                    builder.Append(scopeDuration.Value.ToString());
 #endif
                 }
             }

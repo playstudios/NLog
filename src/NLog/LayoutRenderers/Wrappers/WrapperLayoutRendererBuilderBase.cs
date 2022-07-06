@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -56,11 +56,7 @@ namespace NLog.LayoutRenderers.Wrappers
             }
         }
 
-        /// <summary>
-        /// Transforms the output of another layout.
-        /// </summary>
-        /// <param name="logEvent"></param>
-        /// <param name="target">Output to be transform.</param>
+        /// <inheritdoc/>
         [Obsolete("Inherit from WrapperLayoutRendererBase and override RenderInnerAndTransform() instead. Marked obsolete in NLog 4.6")]
         protected virtual void TransformFormattedMesssage(LogEventInfo logEvent, StringBuilder target)
         {
@@ -82,24 +78,16 @@ namespace NLog.LayoutRenderers.Wrappers
         [Obsolete("Inherit from WrapperLayoutRendererBase and override RenderInnerAndTransform() instead. Marked obsolete in NLog 4.6")]
         protected virtual void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
-            Inner.RenderAppendBuilder(logEvent, target);
+            Inner.Render(logEvent, target);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="text"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         protected sealed override string Transform(string text)
         {
             throw new NotSupportedException("Inherit from WrapperLayoutRendererBase and override RenderInnerAndTransform()");
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="logEvent"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         protected sealed override string RenderInner(LogEventInfo logEvent)
         {
             throw new NotSupportedException("Inherit from WrapperLayoutRendererBase and override RenderInnerAndTransform()");

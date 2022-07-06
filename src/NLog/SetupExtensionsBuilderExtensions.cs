@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,6 +34,7 @@
 namespace NLog
 {
     using System;
+    using System.ComponentModel;
     using System.Reflection;
     using NLog.Config;
     using NLog.Internal;
@@ -50,11 +51,26 @@ namespace NLog
         /// Enable/disables autoloading of NLog extensions by scanning and loading available assemblies
         /// </summary>
         /// <remarks>
-        /// Enabled by default, and gives a huge performance hit during startup. Recommended to disable this when running in the cloud.
+        /// Disabled by default as it can give a huge performance hit during startup. Recommended to keep it disabled especially when running in the cloud.
         /// </remarks>
+        [Obsolete("AutoLoadAssemblies(true) has been replaced by AutoLoadExtensions(), that matches the name of nlog-attribute in NLog.config. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public static ISetupExtensionsBuilder AutoLoadAssemblies(this ISetupExtensionsBuilder setupBuilder, bool enable)
         {
-            ConfigurationItemFactory.Default = enable ? null : new ConfigurationItemFactory(typeof(SetupBuilderExtensions).GetAssembly());
+            if (enable)
+                AutoLoadExtensions(setupBuilder);
+            return setupBuilder;
+        }
+
+        /// <summary>
+        /// Enable/disables autoloading of NLog extensions by scanning and loading available assemblies
+        /// </summary>
+        /// <remarks>
+        /// Disabled by default as it can give a huge performance hit during startup. Recommended to keep it disabled especially when running in the cloud.
+        /// </remarks>
+        public static ISetupExtensionsBuilder AutoLoadExtensions(this ISetupExtensionsBuilder setupBuilder)
+        {
+            ConfigurationItemFactory.ScanForAutoLoadExtensions(setupBuilder.LogFactory);
             return setupBuilder;
         }
 
@@ -63,7 +79,7 @@ namespace NLog
         /// </summary>
         public static ISetupExtensionsBuilder RegisterAssembly(this ISetupExtensionsBuilder setupBuilder, Assembly assembly)
         {
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.RegisterItemsFromAssembly(assembly);
+            ConfigurationItemFactory.Default.RegisterItemsFromAssembly(assembly);
             return setupBuilder;
         }
 
@@ -73,44 +89,48 @@ namespace NLog
         public static ISetupExtensionsBuilder RegisterAssembly(this ISetupExtensionsBuilder setupBuilder, string assemblyName)
         {
             Assembly assembly = AssemblyHelpers.LoadFromName(assemblyName);
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.RegisterItemsFromAssembly(assembly);
+            ConfigurationItemFactory.Default.RegisterItemsFromAssembly(assembly);
             return setupBuilder;
         }
 
         /// <summary>
         /// Register a custom Target.
         /// </summary>
+        /// <typeparam name="T">Type of the Target.</typeparam>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <typeparam name="T"> Type of the Target.</typeparam>
-        /// <param name="name"> Name of the Target.</param>
-        public static ISetupExtensionsBuilder RegisterTarget<T>(this ISetupExtensionsBuilder setupBuilder, string name) where T : Target
+        /// <param name="name">The target type-alias for use in NLog configuration. Will extract from class-attribute when unassigned.</param>
+        public static ISetupExtensionsBuilder RegisterTarget<T>(this ISetupExtensionsBuilder setupBuilder, string name = null) where T : Target
         {
-            var layoutRendererType = typeof(T);
-            return RegisterTarget(setupBuilder, name, layoutRendererType);
+            var targetType = typeof(T);
+            name = string.IsNullOrEmpty(name) ? (targetType.GetFirstCustomAttribute<TargetAttribute>()?.Name ?? typeof(T).Name) : name;
+            return RegisterTarget(setupBuilder, name, targetType);
         }
 
         /// <summary>
         /// Register a custom Target.
         /// </summary>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <param name="targetType"> Type of the Target.</param>
-        /// <param name="name"> Name of the Target.</param>
+        /// <param name="name">Type name of the Target</param>
+        /// <param name="targetType">The target type-alias for use in NLog configuration</param>
         public static ISetupExtensionsBuilder RegisterTarget(this ISetupExtensionsBuilder setupBuilder, string name, Type targetType)
         {
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.Targets.RegisterDefinition(name, targetType);
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentException("Missing target type-alias", nameof(name));
+            ConfigurationItemFactory.Default.Targets.RegisterDefinition(name, targetType);
             return setupBuilder;
         }
 
         /// <summary>
         /// Register a custom layout renderer.
         /// </summary>
+        /// <typeparam name="T">Type of the layout renderer.</typeparam>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <typeparam name="T"> Type of the layout renderer.</typeparam>
-        /// <param name="name"> Name of the layout renderer - without ${}.</param>
-        public static ISetupExtensionsBuilder RegisterLayoutRenderer<T>(this ISetupExtensionsBuilder setupBuilder, string name)
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'. Will extract from class-attribute when unassigned.</param>
+        public static ISetupExtensionsBuilder RegisterLayoutRenderer<T>(this ISetupExtensionsBuilder setupBuilder, string name = null)
             where T : LayoutRenderer
         {
             var layoutRendererType = typeof(T);
+            name = string.IsNullOrEmpty(name) ? (layoutRendererType.GetFirstCustomAttribute<LayoutRendererAttribute>()?.Name ?? typeof(T).Name) : name;
             return RegisterLayoutRenderer(setupBuilder, name, layoutRendererType);
         }
 
@@ -118,11 +138,13 @@ namespace NLog
         /// Register a custom layout renderer.
         /// </summary>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <param name="layoutRendererType"> Type of the layout renderer.</param>
-        /// <param name="name"> Name of the layout renderer - without ${}.</param>
+        /// <param name="layoutRendererType">Type of the layout renderer.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         public static ISetupExtensionsBuilder RegisterLayoutRenderer(this ISetupExtensionsBuilder setupBuilder, string name, Type layoutRendererType)
         {
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.LayoutRenderers.RegisterDefinition(name, layoutRendererType);
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentException("Missing layout-renderer type-alias", nameof(name));
+            ConfigurationItemFactory.Default.LayoutRenderers.RegisterDefinition(name, layoutRendererType);
             return setupBuilder;
         }
 
@@ -130,7 +152,7 @@ namespace NLog
         /// Register a custom layout renderer with a callback function <paramref name="layoutMethod"/>. The callback receives the logEvent.
         /// </summary>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <param name="name">Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         /// <param name="layoutMethod">Callback that returns the value for the layout renderer.</param>
         public static ISetupExtensionsBuilder RegisterLayoutRenderer(this ISetupExtensionsBuilder setupBuilder, string name, Func<LogEventInfo, object> layoutMethod)
         {
@@ -141,7 +163,7 @@ namespace NLog
         /// Register a custom layout renderer with a callback function <paramref name="layoutMethod"/>. The callback receives the logEvent and the current configuration.
         /// </summary>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <param name="name">Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         /// <param name="layoutMethod">Callback that returns the value for the layout renderer.</param>
         public static ISetupExtensionsBuilder RegisterLayoutRenderer(this ISetupExtensionsBuilder setupBuilder, string name, Func<LogEventInfo, LoggingConfiguration, object> layoutMethod)
         {
@@ -152,7 +174,7 @@ namespace NLog
         /// Register a custom layout renderer with a callback function <paramref name="layoutMethod"/>. The callback receives the logEvent.
         /// </summary>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <param name="name">Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         /// <param name="layoutMethod">Callback that returns the value for the layout renderer.</param>
         /// <param name="options">Options of the layout renderer.</param>
         public static ISetupExtensionsBuilder RegisterLayoutRenderer(this ISetupExtensionsBuilder setupBuilder, string name, Func<LogEventInfo, object> layoutMethod, LayoutRenderOptions options)
@@ -164,13 +186,13 @@ namespace NLog
         /// Register a custom layout renderer with a callback function <paramref name="layoutMethod"/>. The callback receives the logEvent and the current configuration.
         /// </summary>
         /// <param name="setupBuilder">Fluent interface parameter.</param>
-        /// <param name="name">Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         /// <param name="layoutMethod">Callback that returns the value for the layout renderer.</param>
         /// <param name="options">Options of the layout renderer.</param>
         public static ISetupExtensionsBuilder RegisterLayoutRenderer(this ISetupExtensionsBuilder setupBuilder, string name, Func<LogEventInfo, LoggingConfiguration, object> layoutMethod, LayoutRenderOptions options)
         {
             FuncLayoutRenderer layoutRenderer = Layout.CreateFuncLayoutRenderer(layoutMethod, options, name);
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.GetLayoutRenderers().RegisterFuncLayout(name, layoutRenderer);
+            ConfigurationItemFactory.Default.GetLayoutRenderers().RegisterFuncLayout(name, layoutRenderer);
             return setupBuilder;
         }
 
@@ -182,19 +204,12 @@ namespace NLog
         /// <param name="conditionMethod">MethodInfo extracted by reflection - typeof(MyClass).GetMethod("MyFunc", BindingFlags.Static).</param>
         public static ISetupExtensionsBuilder RegisterConditionMethod(this ISetupExtensionsBuilder setupBuilder, string name, MethodInfo conditionMethod)
         {
-            if (conditionMethod == null)
+            if (conditionMethod is null)
                 throw new ArgumentNullException(nameof(conditionMethod));
             if (!conditionMethod.IsStatic)
                 throw new ArgumentException($"{conditionMethod.Name} must be static", nameof(conditionMethod));
 
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.ConditionMethods.RegisterDefinition(name, conditionMethod);
-            return setupBuilder;
-        }
-
-#if !NETSTANDARD1_0
-        private static ISetupExtensionsBuilder RegisterConditionMethod(this ISetupExtensionsBuilder setupBuilder, string name, MethodInfo conditionMethod, ReflectionHelpers.LateBoundMethod lateBoundMethod)
-        {
-            setupBuilder.LogFactory.ServiceRepository.ConfigurationItemFactory.ConditionMethodDelegates.RegisterDefinition(name, conditionMethod, lateBoundMethod);
+            ConfigurationItemFactory.Default.ConditionMethods.RegisterDefinition(name, conditionMethod);
             return setupBuilder;
         }
 
@@ -206,10 +221,10 @@ namespace NLog
         /// <param name="conditionMethod">Lambda method.</param>
         public static ISetupExtensionsBuilder RegisterConditionMethod(this ISetupExtensionsBuilder setupBuilder, string name, Func<LogEventInfo, object> conditionMethod)
         {
-            if (conditionMethod == null)
+            if (conditionMethod is null)
                 throw new ArgumentNullException(nameof(conditionMethod));
             ReflectionHelpers.LateBoundMethod lateBound = (target, args) => conditionMethod((LogEventInfo)args[0]);
-            return RegisterConditionMethod(setupBuilder, name, conditionMethod.Method, lateBound);
+            return RegisterConditionMethod(setupBuilder, name, conditionMethod, lateBound);
         }
 
         /// <summary>
@@ -220,11 +235,62 @@ namespace NLog
         /// <param name="conditionMethod">Lambda method.</param>
         public static ISetupExtensionsBuilder RegisterConditionMethod(this ISetupExtensionsBuilder setupBuilder, string name, Func<object> conditionMethod)
         {
-            if (conditionMethod == null)
+            if (conditionMethod is null)
                 throw new ArgumentNullException(nameof(conditionMethod));
             ReflectionHelpers.LateBoundMethod lateBound = (target, args) => conditionMethod();
-            return RegisterConditionMethod(setupBuilder, name, conditionMethod.Method, lateBound);
+            return RegisterConditionMethod(setupBuilder, name, conditionMethod, lateBound);
         }
-#endif
+
+        private static ISetupExtensionsBuilder RegisterConditionMethod(this ISetupExtensionsBuilder setupBuilder, string name, Delegate conditionMethod, ReflectionHelpers.LateBoundMethod lateBoundMethod)
+        {
+            ConfigurationItemFactory.Default.ConditionMethodDelegates.RegisterDefinition(name, conditionMethod.GetDelegateInfo(), lateBoundMethod);
+            return setupBuilder;
+        }
+
+        /// <summary>
+        /// Register (or replaces) singleton-object for the specified service-type
+        /// </summary>
+        /// <typeparam name="T">Service interface type</typeparam>
+        /// <param name="setupBuilder">Fluent interface parameter.</param>
+        /// <param name="singletonService">Implementation of interface.</param>
+        public static ISetupExtensionsBuilder RegisterSingletonService<T>(this ISetupExtensionsBuilder setupBuilder, T singletonService) where T : class
+        {
+            if (singletonService is null)
+                throw new ArgumentNullException(nameof(singletonService));
+            setupBuilder.LogFactory.ServiceRepository.RegisterSingleton<T>(singletonService);
+            return setupBuilder;
+        }
+
+        /// <summary>
+        /// Register (or replaces) singleton-object for the specified service-type
+        /// </summary>
+        /// <param name="setupBuilder">Fluent interface parameter.</param>
+        /// <param name="interfaceType">Service interface type.</param>
+        /// <param name="singletonService">Implementation of interface.</param>
+        public static ISetupExtensionsBuilder RegisterSingletonService(this ISetupExtensionsBuilder setupBuilder, Type interfaceType, object singletonService)
+        {
+            if (interfaceType is null)
+                throw new ArgumentNullException(nameof(interfaceType));
+            if (singletonService is null)
+                throw new ArgumentNullException(nameof(singletonService));
+            if (!interfaceType.IsAssignableFrom(singletonService.GetType()))
+                throw new ArgumentException("Service instance not matching type", nameof(singletonService));
+            setupBuilder.LogFactory.ServiceRepository.RegisterService(interfaceType, singletonService);
+            return setupBuilder;
+        }
+
+        /// <summary>
+        /// Register (or replaces) external service-repository for resolving dependency injection
+        /// </summary>
+        /// <param name="setupBuilder">Fluent interface parameter.</param>
+        /// <param name="serviceProvider">External dependency injection repository</param>
+        public static ISetupExtensionsBuilder RegisterServiceProvider(this ISetupExtensionsBuilder setupBuilder, IServiceProvider serviceProvider)
+        {
+            if (serviceProvider is null)
+                throw new ArgumentNullException(nameof(serviceProvider));
+
+            setupBuilder.LogFactory.ServiceRepository.RegisterSingleton(serviceProvider);
+            return setupBuilder;
+        }
     }
 }

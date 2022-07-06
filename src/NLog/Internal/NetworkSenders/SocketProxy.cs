@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -52,6 +52,12 @@ namespace NLog.Internal.NetworkSenders
         internal SocketProxy(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
         {
             _socket = new Socket(addressFamily, socketType, protocolType);
+#if !NET35
+            if (addressFamily == AddressFamily.InterNetworkV6)
+            {
+                _socket.DualMode = true;   // Allow for IPv4 mapped addresses over IPv6
+            }
+#endif
         }
 
         /// <summary>

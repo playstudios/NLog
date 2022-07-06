@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,8 +31,6 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using NLog.Config;
-
 namespace NLog.UnitTests.LayoutRenderers
 {
     using Xunit;
@@ -42,17 +40,49 @@ namespace NLog.UnitTests.LayoutRenderers
         [Fact]
         public void LiteralTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
             <nlog>
                 <targets><target name='debug' type='Debug' layout='abcd' /></targets>
                 <rules>
                     <logger name='*' minlevel='Debug' writeTo='debug' />
                 </rules>
-            </nlog>");
+            </nlog>").LogFactory;
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = logFactory.GetLogger("A");
             logger.Debug("a");
-            AssertDebugLastMessage("debug", "abcd");
+            logFactory.AssertDebugLastMessage("abcd");
+        }
+
+        [Fact]
+        public void LiteralExplicitTextTest()
+        {
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
+            <nlog>
+                <targets><target name='debug' type='Debug' layout='${literal:text=a\=\:\}b\t\nc\u003ad}' /></targets>
+                <rules>
+                    <logger name='*' minlevel='Debug' writeTo='debug' />
+                </rules>
+            </nlog>").LogFactory;
+
+            var logger = logFactory.GetLogger("A");
+            logger.Debug("a");
+            logFactory.AssertDebugLastMessage("a=:}b\t\nc:d");
+        }
+
+        [Fact]
+        public void LiteralDefaultTextTest()
+        {
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
+            <nlog>
+                <targets><target name='debug' type='Debug' layout='${literal:a\=\:\}b\t\nc\u003ad}' /></targets>
+                <rules>
+                    <logger name='*' minlevel='Debug' writeTo='debug' />
+                </rules>
+            </nlog>").LogFactory;
+
+            var logger = logFactory.GetLogger("A");
+            logger.Debug("a");
+            logFactory.AssertDebugLastMessage("a=:}b\t\nc:d");
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -38,15 +38,17 @@ namespace NLog.UnitTests.Internal
 {
     public class PlatformDetectorTests
     {
+#if !NETSTANDARD
         [Fact]
         public void IsMonoTest()
         {
 #if MONO
             Assert.True(PlatformDetector.IsMono);
-#elif NET3_5 || NET4_0 || NET4_5
+#else
             Assert.False(PlatformDetector.IsMono);
 #endif
         }
+#endif
 
         [Fact]
         public void GetCurrentOSTest()

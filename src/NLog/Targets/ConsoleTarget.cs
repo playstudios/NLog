@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -37,9 +37,9 @@ namespace NLog.Targets
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.IO;
     using System.Text;
-    using System.ComponentModel;
     using NLog.Common;
     using NLog.Internal;
     using NLog.Layouts;
@@ -47,17 +47,16 @@ namespace NLog.Targets
     /// <summary>
     /// Writes log messages to the console.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/Console-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/Console-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Console/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
@@ -76,7 +75,7 @@ namespace NLog.Targets
         ///             
         /// Full error: 
         ///   Error during session close: System.IndexOutOfRangeException: Probable I/ O race condition detected while copying memory.
-        ///   The I/ O package is not thread safe by default. In multi threaded applications, 
+        ///   The I/ O package is not thread safe by default. In multi-threaded applications, 
         ///   a stream must be accessed in a thread-safe way, such as a thread - safe wrapper returned by TextReader's or 
         ///   TextWriter's Synchronized methods.This also applies to classes like StreamWriter and StreamReader.
         /// 
@@ -89,8 +88,15 @@ namespace NLog.Targets
         /// Gets or sets a value indicating whether to send the log messages to the standard error instead of the standard output.
         /// </summary>
         /// <docgen category='Console Options' order='10' />
-        [DefaultValue(false)]
-        public bool Error { get; set; }
+        [Obsolete("Replaced by StdErr to align with ColoredConsoleTarget. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool Error { get => StdErr; set => StdErr = value; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to send the log messages to the standard error instead of the standard output.
+        /// </summary>
+        /// <docgen category='Console Options' order='10' />
+        public bool StdErr { get; set; }
 
         /// <summary>
         /// The encoding for writing messages to the <see cref="Console"/>.
@@ -114,7 +120,6 @@ namespace NLog.Targets
         ///  - Disables console writing if Console Standard Input is not available (Non-Console-App)
         /// </summary>
         /// <docgen category='Console Options' order='10' />
-        [DefaultValue(false)]
         public bool DetectConsoleAvailable { get; set; }
 
         /// <summary>
@@ -124,15 +129,13 @@ namespace NLog.Targets
         /// Normally not required as standard Console.Out will have <see cref="StreamWriter.AutoFlush"/> = true, but not when pipe to file
         /// </remarks>
         /// <docgen category='Console Options' order='10' />
-        [DefaultValue(false)]
         public bool AutoFlush { get; set; }
 
         /// <summary>
-        /// Gets or sets whether to enable batch writing using char[]-buffers, instead of using <see cref="Console.WriteLine()"/>
+        /// Gets or sets whether to activate internal buffering to allow batch writing, instead of using <see cref="Console.WriteLine()"/>
         /// </summary>
         /// <docgen category='Console Options' order='10' />
-        [DefaultValue(false)]
-        public bool WriteBuffer { get; set; } = false;
+        public bool WriteBuffer { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ConsoleTarget" /> class.
@@ -142,7 +145,6 @@ namespace NLog.Targets
         /// </remarks>
         public ConsoleTarget() : base()
         {
-            OptimizeBufferReuse = true;
         }
 
         /// <summary>
@@ -158,9 +160,7 @@ namespace NLog.Targets
             Name = name;
         }
 
-        /// <summary>
-        /// Initializes the target.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeTarget()
         {
             _pauseLogging = false;
@@ -170,7 +170,7 @@ namespace NLog.Targets
                 _pauseLogging = !ConsoleTargetHelper.IsConsoleAvailable(out reason);
                 if (_pauseLogging)
                 {
-                    InternalLogger.Info("Console(Name={0}): Console has been detected as turned off. Disable DetectConsoleAvailable to skip detection. Reason: {1}", Name, reason);
+                    InternalLogger.Info("{0}: Console has been detected as turned off. Disable DetectConsoleAvailable to skip detection. Reason: {1}", this, reason);
                 }
             }
 
@@ -184,9 +184,7 @@ namespace NLog.Targets
             }
         }
 
-        /// <summary>
-        /// Closes the target and releases any unmanaged resources.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void CloseTarget()
         {
             if (Footer != null)
@@ -197,7 +195,7 @@ namespace NLog.Targets
             base.CloseTarget();
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void FlushAsync(AsyncContinuation asyncContinuation)
         {
             try
@@ -220,14 +218,7 @@ namespace NLog.Targets
             }
         }
 
-        /// <summary>
-        /// Writes the specified logging event to the Console.Out or
-        /// Console.Error depending on the value of the Error flag.
-        /// </summary>
-        /// <param name="logEvent">The logging event.</param>
-        /// <remarks>
-        /// Note that the Error option is not supported on .NET Compact Framework.
-        /// </remarks>
+        /// <inheritdoc/>
         protected override void Write(LogEventInfo logEvent)
         {
             if (_pauseLogging)
@@ -257,9 +248,6 @@ namespace NLog.Targets
             }
         }
 
-        /// <summary>
-        /// Write to output
-        /// </summary>
         private void RenderToOutput(Layout layout, LogEventInfo logEvent)
         {
             if (_pauseLogging)
@@ -303,7 +291,7 @@ namespace NLog.Targets
                 {
                     for (int i = 0; i < logEvents.Count; ++i)
                     {
-                        targetBuilder.Result.Length = 0;
+                        targetBuilder.Result.ClearBuilder();
                         RenderLogEventToWriteBuffer(output, Layout, logEvents[i].LogEvent, targetBuilder.Result, targetBuffer.Result, ref targetBufferPosition);
                         logEvents[i].Continuation(null);
                     }
@@ -321,7 +309,7 @@ namespace NLog.Targets
         private void RenderLogEventToWriteBuffer(TextWriter output, Layout layout, LogEventInfo logEvent, StringBuilder targetBuilder, char[] targetBuffer, ref int targetBufferPosition)
         {
             int environmentNewLineLength = System.Environment.NewLine.Length;
-            layout.RenderAppendBuilder(logEvent, targetBuilder);
+            layout.Render(logEvent, targetBuilder);
             if (targetBuilder.Length > targetBuffer.Length - targetBufferPosition - environmentNewLineLength)
             {
                 if (targetBufferPosition > 0)
@@ -351,8 +339,8 @@ namespace NLog.Targets
             {
                 //this is a bug and therefor stopping logging. For docs, see PauseLogging property
                 _pauseLogging = true;
-                InternalLogger.Warn(ex, "Console(Name={0}): {1} has been thrown and this is probably due to a race condition." +
-                                        "Logging to the console will be paused. Enable by reloading the config or re-initialize the targets", Name, ex.GetType());
+                InternalLogger.Warn(ex, "{0}: {1} has been thrown and this is probably due to a race condition." +
+                                        "Logging to the console will be paused. Enable by reloading the config or re-initialize the targets", this, ex.GetType());
             }
         }
 
@@ -366,14 +354,14 @@ namespace NLog.Targets
             {
                 //this is a bug and therefor stopping logging. For docs, see PauseLogging property
                 _pauseLogging = true;
-                InternalLogger.Warn(ex, "Console(Name={0}): {1} has been thrown and this is probably due to a race condition." +
-                                        "Logging to the console will be paused. Enable by reloading the config or re-initialize the targets", Name, ex.GetType());
+                InternalLogger.Warn(ex, "{0}: {1} has been thrown and this is probably due to a race condition." +
+                                        "Logging to the console will be paused. Enable by reloading the config or re-initialize the targets", this, ex.GetType());
             }
         }
 
         private TextWriter GetOutput()
         {
-            return Error ? Console.Error : Console.Out;
+            return StdErr ? Console.Error : Console.Out;
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -58,7 +58,6 @@ namespace NLog.Config
         /// the specified level are output to the console.
         /// </summary>
         /// <param name="minLevel">The minimal logging level.</param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "Target is disposed elsewhere.")]
         public static void ConfigureForConsoleLogging(LogLevel minLevel)
         {
             ConsoleTarget consoleTarget = new ConsoleTarget();
@@ -76,7 +75,7 @@ namespace NLog.Config
         /// <param name="target">The target to log all messages to.</param>
         public static void ConfigureForTargetLogging(Target target)
         {
-            if (target == null) { throw new ArgumentNullException(nameof(target)); }
+            if (target is null) { throw new ArgumentNullException(nameof(target)); }
             ConfigureForTargetLogging(target, LogLevel.Info);
         }
 
@@ -88,7 +87,7 @@ namespace NLog.Config
         /// <param name="minLevel">The minimal logging level.</param>
         public static void ConfigureForTargetLogging(Target target, LogLevel minLevel)
         {
-            if (target == null) { throw new ArgumentNullException(nameof(target)); }
+            if (target is null) { throw new ArgumentNullException(nameof(target)); }
             LoggingConfiguration config = new LoggingConfiguration();
             config.AddRule(minLevel, LogLevel.MaxLevel, target, "*");
             LogManager.Configuration = config;
@@ -110,7 +109,6 @@ namespace NLog.Config
         /// </summary>
         /// <param name="fileName">Log file name.</param>
         /// <param name="minLevel">The minimal logging level.</param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "Target is disposed elsewhere.")]
         public static void ConfigureForFileLogging(string fileName, LogLevel minLevel)
         {
             FileTarget target = new FileTarget();

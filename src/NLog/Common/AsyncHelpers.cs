@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -46,29 +46,29 @@ namespace NLog.Common
     {
         internal static int GetManagedThreadId()
         {
-#if NETSTANDARD1_3
-            return System.Environment.CurrentManagedThreadId;
-#else
+#if !NETSTANDARD1_3
             return Thread.CurrentThread.ManagedThreadId;
+#else
+            return System.Environment.CurrentManagedThreadId;            
 #endif
         }
 
         internal static void StartAsyncTask(AsyncHelpersTask asyncTask, object state)
         {
             var asyncDelegate = asyncTask.AsyncDelegate;
-#if NETSTANDARD1_0
-            System.Threading.Tasks.Task.Factory.StartNew(asyncDelegate, state, CancellationToken.None, System.Threading.Tasks.TaskCreationOptions.None, System.Threading.Tasks.TaskScheduler.Default);
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             ThreadPool.QueueUserWorkItem(asyncDelegate, state);
+#else
+            System.Threading.Tasks.Task.Factory.StartNew(asyncDelegate, state, CancellationToken.None, System.Threading.Tasks.TaskCreationOptions.None, System.Threading.Tasks.TaskScheduler.Default);       
 #endif
         }
 
         internal static void WaitForDelay(TimeSpan delay)
         {
-#if NETSTANDARD1_3
-            System.Threading.Tasks.Task.Delay(delay).Wait();
-#else
+#if !NETSTANDARD1_3
             Thread.Sleep(delay);
+#else
+            System.Threading.Tasks.Task.Delay(delay).ConfigureAwait(false).GetAwaiter().GetResult();
 #endif
         }
 
@@ -81,6 +81,7 @@ namespace NLog.Common
         /// <param name="asyncContinuation">The asynchronous continuation to invoke once all items
         /// have been iterated.</param>
         /// <param name="action">The action to invoke for each item.</param>
+        [Obsolete("Marked obsolete on NLog 5.0")]
         public static void ForEachItemSequentially<T>(IEnumerable<T> items, AsyncContinuation asyncContinuation, AsynchronousAction<T> action)
         {
             action = ExceptionGuard(action);
@@ -145,6 +146,7 @@ namespace NLog.Common
         /// <param name="asyncContinuation">The async continuation.</param>
         /// <param name="action">The action to pre-pend.</param>
         /// <returns>Continuation which will execute the given action before forwarding to the actual continuation.</returns>
+        [Obsolete("Marked obsolete on NLog 5.0")]
         public static AsyncContinuation PrecededBy(AsyncContinuation asyncContinuation, AsynchronousAction action)
         {
             action = ExceptionGuard(action);
@@ -154,7 +156,7 @@ namespace NLog.Common
                 {
                     if (ex != null)
                     {
-                        // if got exception from from original invocation, don't execute action
+                        // if got exception from original invocation, don't execute action
                         asyncContinuation(ex);
                         return;
                     }
@@ -173,7 +175,6 @@ namespace NLog.Common
         /// <param name="asyncContinuation">The asynchronous continuation.</param>
         /// <param name="timeout">The timeout.</param>
         /// <returns>Wrapped continuation.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "Continuation will be disposed of elsewhere.")]
         public static AsyncContinuation WithTimeout(AsyncContinuation asyncContinuation, TimeSpan timeout)
         {
             return new TimeoutContinuation(asyncContinuation, timeout).Function;
@@ -230,17 +231,21 @@ namespace NLog.Common
                 T itemCopy = item;
                 StartAsyncTask(new AsyncHelpersTask(s =>
                 {
+                    var preventMultipleCalls = PreventMultipleCalls(continuation);
                     try
                     {
-                        action(itemCopy, PreventMultipleCalls(continuation));
+                        action(itemCopy, preventMultipleCalls);
                     }
                     catch (Exception ex)
                     {
-                        InternalLogger.Error(ex, "ForEachItemInParallel - Unhandled Exception");
+#if DEBUG
                         if (ex.MustBeRethrownImmediately())
                         {
                             throw;  // Throwing exceptions here will crash the entire application (.NET 2.0 behavior)
                         }
+#endif
+                        InternalLogger.Error(ex, "ForEachItemInParallel - Unhandled Exception");
+                        preventMultipleCalls.Invoke(ex);
                     }
                 }), null);
             }
@@ -254,6 +259,7 @@ namespace NLog.Common
         /// <remarks>
         /// Using this method is not recommended because it will block the calling thread.
         /// </remarks>
+        [Obsolete("Marked obsolete on NLog 5.0")]
         public static void RunSynchronously(AsynchronousAction action)
         {
             var ev = new ManualResetEvent(false);

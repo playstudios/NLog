@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -46,43 +46,60 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("event-properties")]
     [LayoutRenderer("event-context")]
     [ThreadAgnostic]
-    [ThreadSafe]
     [MutableUnsafe]
     public class EventPropertiesLayoutRenderer : LayoutRenderer, IRawValue, IStringValueRenderer
     {
-        private ObjectReflectionCache ObjectReflectionCache => _objectReflectionCache ?? (_objectReflectionCache = new ObjectReflectionCache(LoggingConfiguration.GetServiceResolver()));
+        private ObjectReflectionCache ObjectReflectionCache => _objectReflectionCache ?? (_objectReflectionCache = new ObjectReflectionCache(LoggingConfiguration.GetServiceProvider()));
         private ObjectReflectionCache _objectReflectionCache;
         private ObjectPropertyPath _objectPropertyPath;
 
         /// <summary>
         /// Gets or sets the name of the item.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [RequiredParameter]
         [DefaultParameter]
-        public string Item { get; set; }
+        public string Item { get => _item?.ToString(); set => _item = (value != null && IgnoreCase) ? new PropertiesDictionary.IgnoreCasePropertyKey(value) : (object)value; }
+        private object _item;
 
         /// <summary>
         /// Format string for conversion from object to string.
         /// </summary>
-        /// <docgen category='Rendering Options' order='50' />
+        /// <docgen category='Layout Options' order='50' />
         public string Format { get; set; }
 
         /// <summary>
         /// Gets or sets the culture used for rendering. 
         /// </summary>
-        /// <docgen category='Rendering Options' order='100' />
+        /// <docgen category='Layout Options' order='100' />
         public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
 
         /// <summary>
         /// Gets or sets the object-property-navigation-path for lookup of nested property
         /// </summary>
-        /// <docgen category='Rendering Options' order='20' />
+        /// <docgen category='Layout Options' order='20' />
         public string ObjectPath
         {
             get => _objectPropertyPath.Value;
             set => _objectPropertyPath.Value = value;
         }
+
+        /// <summary>
+        /// Gets or sets whether to perform case-sensitive property-name lookup
+        /// </summary>
+        public bool IgnoreCase
+        {
+            get => _ignoreCase;
+            set
+            {
+                if (value != _ignoreCase)
+                {
+                    _ignoreCase = value;
+                    Item = _item?.ToString();
+                }
+            }
+        }
+        private bool _ignoreCase = true;
 
         /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
@@ -94,14 +111,12 @@ namespace NLog.LayoutRenderers
             }
         }
 
-        /// <inheritdoc/>
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             TryGetValue(logEvent, out value);
             return true;
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => GetStringValue(logEvent);
 
         private bool TryGetValue(LogEventInfo logEvent, out object value)
@@ -111,7 +126,7 @@ namespace NLog.LayoutRenderers
             if (!logEvent.HasProperties)
                 return false;
 
-            if (!logEvent.Properties.TryGetValue(Item, out value))
+            if (!logEvent.Properties.TryGetValue(_item, out value))
                 return false;
 
             if (_objectPropertyPath.PathNames != null)

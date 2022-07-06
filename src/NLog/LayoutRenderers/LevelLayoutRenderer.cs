@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
@@ -43,16 +42,33 @@ namespace NLog.LayoutRenderers
     /// The log level.
     /// </summary>
     [LayoutRenderer("level")]
+    [LayoutRenderer("loglevel")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class LevelLayoutRenderer : LayoutRenderer, IRawValue, IStringValueRenderer
     {
+        private static readonly string[] _upperCaseMapper = new string[]
+        {
+            LogLevel.Trace.ToString().ToUpperInvariant(),
+            LogLevel.Debug.ToString().ToUpperInvariant(),
+            LogLevel.Info.ToString().ToUpperInvariant(),
+            LogLevel.Warn.ToString().ToUpperInvariant(),
+            LogLevel.Error.ToString().ToUpperInvariant(),
+            LogLevel.Fatal.ToString().ToUpperInvariant(),
+            LogLevel.Off.ToString().ToUpperInvariant(),
+        };
+
         /// <summary>
         /// Gets or sets a value indicating the output format of the level.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(LevelFormat.Name)]
-        public LevelFormat Format { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public LevelFormat Format { get; set; } = LevelFormat.Name;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether upper case conversion should be applied.
+        /// </summary>
+        /// <value>A value of <c>true</c> if upper case conversion should be applied otherwise, <c>false</c>.</value>
+        /// <docgen category='Layout Options' order='10' />
+        public bool Uppercase { get; set; }
 
         /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
@@ -61,7 +77,7 @@ namespace NLog.LayoutRenderers
             switch (Format)
             {
                 case LevelFormat.Name:
-                    builder.Append(level.ToString());
+                    builder.Append(Uppercase ? GetUpperCaseString(level) : level.ToString());
                     break;
                 case LevelFormat.FirstCharacter:
                     builder.Append(level.ToString()[0]);
@@ -71,24 +87,42 @@ namespace NLog.LayoutRenderers
                     break;
                 case LevelFormat.FullName:
                     if (level == LogLevel.Info)
-                        builder.Append("Information");
+                        builder.Append(Uppercase ? "INFORMATION" : "Information");
                     else if (level == LogLevel.Warn)
-                        builder.Append("Warning");
+                        builder.Append(Uppercase ? "WARNING" : "Warning");
                     else
-                        builder.Append(level.ToString());
+                        builder.Append(Uppercase ? GetUpperCaseString(level) : level.ToString());
                     break;
             }
         }
 
-        /// <inheritdoc/>
+        private string GetUpperCaseString(LogLevel level)
+        {
+            try
+            {
+                return _upperCaseMapper[level.Ordinal];
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return level.ToString().ToUpperInvariant();
+            }
+        }
+
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             value = GetValue(logEvent);
             return true;
         }
 
-        /// <inheritdoc/>
-        string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => Format == LevelFormat.Name ? GetValue(logEvent).ToString() : null;
+        string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent)
+        {
+            if (Format == LevelFormat.Name)
+            {
+                var level = GetValue(logEvent);
+                return Uppercase ? GetUpperCaseString(level) : level.ToString();
+            }
+            return null;
+        }
 
         private static LogLevel GetValue(LogEventInfo logEvent)
         {

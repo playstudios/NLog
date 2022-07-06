@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -81,7 +81,7 @@ namespace NLog.Conditions
         /// <returns>The root of the expression syntax tree which can be used to get the value of the condition in a specified context.</returns>
         public static ConditionExpression ParseExpression(string expressionText, ConfigurationItemFactory configurationItemFactories)
         {
-            if (expressionText == null)
+            if (expressionText is null)
             {
                 return null;
             }
@@ -177,9 +177,12 @@ namespace NLog.Conditions
 
             if (_tokenizer.TokenType == ConditionTokenType.String)
             {
-                ConditionExpression e = new ConditionLayoutExpression(new SimpleLayout(_tokenizer.StringTokenValue, _configurationItemFactory));
+                var simpleLayout = new SimpleLayout(_tokenizer.StringTokenValue, _configurationItemFactory);
                 _tokenizer.GetNextToken();
-                return e;
+                if (simpleLayout.IsFixedText)
+                    return new ConditionLiteralExpression(simpleLayout.FixedText);
+                else
+                    return new ConditionLayoutExpression(simpleLayout);
             }
 
             if (_tokenizer.TokenType == ConditionTokenType.Keyword)
@@ -213,59 +216,51 @@ namespace NLog.Conditions
         {
             if (0 == string.Compare(keyword, "level", StringComparison.OrdinalIgnoreCase))
             {
-                {
-                    expression = new ConditionLevelExpression();
-                    return true;
-                }
+                expression = new ConditionLevelExpression();
+                return true;
             }
 
             if (0 == string.Compare(keyword, "logger", StringComparison.OrdinalIgnoreCase))
             {
-                {
-                    expression = new ConditionLoggerNameExpression();
-                    return true;
-                }
+                expression = new ConditionLoggerNameExpression();
+                return true;
             }
 
             if (0 == string.Compare(keyword, "message", StringComparison.OrdinalIgnoreCase))
             {
-                {
-                    expression = new ConditionMessageExpression();
-                    return true;
-                }
+                expression = new ConditionMessageExpression();
+                return true;
+            }
+
+            if (0 == string.Compare(keyword, "exception", StringComparison.OrdinalIgnoreCase))
+            {
+                expression = new ConditionExceptionExpression();
+                return true;
             }
 
             if (0 == string.Compare(keyword, "loglevel", StringComparison.OrdinalIgnoreCase))
             {
                 _tokenizer.Expect(ConditionTokenType.Dot);
-                {
-                    expression = new ConditionLiteralExpression(LogLevel.FromString(_tokenizer.EatKeyword()));
-                    return true;
-                }
+                expression = new ConditionLiteralExpression(LogLevel.FromString(_tokenizer.EatKeyword()));
+                return true;
             }
 
             if (0 == string.Compare(keyword, "true", StringComparison.OrdinalIgnoreCase))
             {
-                {
-                    expression = new ConditionLiteralExpression(ConditionExpression.BoxedTrue);
-                    return true;
-                }
+                expression = new ConditionLiteralExpression(ConditionExpression.BoxedTrue);
+                return true;
             }
 
             if (0 == string.Compare(keyword, "false", StringComparison.OrdinalIgnoreCase))
             {
-                {
-                    expression = new ConditionLiteralExpression(ConditionExpression.BoxedFalse);
-                    return true;
-                }
+                expression = new ConditionLiteralExpression(ConditionExpression.BoxedFalse);
+                return true;
             }
 
             if (0 == string.Compare(keyword, "null", StringComparison.OrdinalIgnoreCase))
             {
-                {
-                    expression = new ConditionLiteralExpression(null);
-                    return true;
-                }
+                expression = new ConditionLiteralExpression(null);
+                return true;
             }
 
             expression = null;

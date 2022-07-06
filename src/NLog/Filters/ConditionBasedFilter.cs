@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,21 +33,19 @@
 
 namespace NLog.Filters
 {
-    using Conditions;
-    using Config;
+    using NLog.Conditions;
+    using NLog.Config;
 
     /// <summary>
     /// Matches when the specified condition is met.
     /// </summary>
     /// <remarks>
-    /// Conditions are expressed using a simple language 
-    /// described <a href="conditions.html">here</a>.
+    /// Conditions are expressed using a simple language.
     /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/Conditions">Documentation on NLog Wiki</seealso>
     [Filter("when")]
     public class ConditionBasedFilter : Filter
     {
-        private static readonly object boxedTrue = true;
-
         /// <summary>
         /// Gets or sets the condition expression.
         /// </summary>
@@ -55,26 +53,18 @@ namespace NLog.Filters
         [RequiredParameter]
         public ConditionExpression Condition { get; set; }
 
-        internal FilterResult DefaultFilterResult { get; set; } = FilterResult.Neutral;
+        internal FilterResult FilterDefaultAction { get; set; } = FilterResult.Neutral;
 
-        /// <summary>
-        /// Checks whether log event should be logged or not.
-        /// </summary>
-        /// <param name="logEvent">Log event.</param>
-        /// <returns>
-        /// <see cref="FilterResult.Ignore"/> - if the log event should be ignored<br/>
-        /// <see cref="FilterResult.Neutral"/> - if the filter doesn't want to decide<br/>
-        /// <see cref="FilterResult.Log"/> - if the log event should be logged<br/>
-        /// .</returns>
+        /// <inheritdoc/>
         protected override FilterResult Check(LogEventInfo logEvent)
         {
             object val = Condition.Evaluate(logEvent);
-            if (boxedTrue.Equals(val))
+            if (ConditionExpression.BoxedTrue.Equals(val))
             {
                 return Action;
             }
 
-            return DefaultFilterResult;
+            return FilterDefaultAction;
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -51,7 +51,7 @@ namespace NLog.Internal
         public MruCache(int maxCapacity)
         {
             _maxCapacity = maxCapacity;
-            _dictionary = new Dictionary<TKey, MruCacheItem>(_maxCapacity);
+            _dictionary = new Dictionary<TKey, MruCacheItem>(_maxCapacity / 4);
             _currentVersion = 1;
         }
 

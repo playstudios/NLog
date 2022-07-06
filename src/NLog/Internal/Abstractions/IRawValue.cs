@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,8 +34,11 @@
 namespace NLog.Internal
 {
     /// <summary>
-    /// Get the Raw, unformatted and unstrinyfied, value
+    /// Get the Raw, unformatted value without stringify
     /// </summary>
+    /// <remarks>
+    /// Implementors must has the  [ThreadAgnostic] attribute
+    /// </remarks>
     internal interface IRawValue
     {
         /// <summary>

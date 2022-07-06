@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if NETSTANDARD1_0
+#if NETSTANDARD1_3 || NETSTANDARD1_5
 
 using System;
 using System.Collections.Generic;
@@ -40,10 +40,11 @@ using System.Reflection;
 
 namespace NLog.Internal.Fakeables
 {
+    [Obsolete("For unit testing only. Marked obsolete on NLog 5.0")]
     internal class FakeAppDomain : IAppDomain
     {
 #if NETSTANDARD1_5
-        System.Runtime.Loader.AssemblyLoadContext _defaultContext;
+        private readonly System.Runtime.Loader.AssemblyLoadContext _defaultContext;
 #endif
 
         /// <summary>Initializes a new instance of the <see cref="T:System.Object" /> class.</summary>

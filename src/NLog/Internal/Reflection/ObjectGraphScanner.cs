@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -79,7 +79,7 @@ namespace NLog.Internal
         private static void ScanProperties<T>(bool aggressiveSearch, List<T> result, object o, int level, HashSet<object> visitedObjects)
             where T : class
         {
-            if (o == null)
+            if (o is null)
             {
                 return;
             }
@@ -115,7 +115,7 @@ namespace NLog.Internal
                     continue;
 
                 var propValue = propInfo.GetValue(o, null);
-                if (propValue == null)
+                if (propValue is null)
                     continue;
 
                 visitedObjects.Add(o);
@@ -170,8 +170,9 @@ namespace NLog.Internal
 
             if (enumerable is IList list)
             {
-                if (!list.IsReadOnly)
+                if (!list.IsReadOnly && !(list is Array))
                 {
+                    // Protect against collection was modified
                     List<object> elements = new List<object>(list.Count);
                     lock (list.SyncRoot)
                     {
@@ -194,7 +195,7 @@ namespace NLog.Internal
         private static bool IncludeConfigurationItem(object item, Type propertyType = null)
         {
             propertyType = propertyType ?? item?.GetType();
-            if (propertyType == null)
+            if (propertyType is null)
                 return false;
 
             if (PropertyHelper.IsConfigurationItemType(propertyType))

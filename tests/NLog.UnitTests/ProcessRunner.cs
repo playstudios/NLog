@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -126,11 +126,9 @@ class C1
             proc.StartInfo.FileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runner.exe");
 #endif
             proc.StartInfo.UseShellExecute = false;
-            proc.StartInfo.WindowStyle = ProcessWindowStyle.Normal;
-            proc.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
             proc.StartInfo.CreateNoWindow = true;
             // Hint:
-            // In case we wanna redirect stdout we should drain the redirected pipe continously.
+            // In case we wanna redirect stdout we should drain the redirected pipe continuously.
             // Otherwise Runner.exe's console buffer is full rather fast, leading to a lock within Console.Write(Line).
             proc.Start();
             return proc;

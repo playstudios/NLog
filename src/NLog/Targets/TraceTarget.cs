@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -37,36 +37,34 @@
 
 namespace NLog.Targets
 {
-    using System.ComponentModel;
     using System.Diagnostics;
 
     /// <summary>
     /// Sends log messages through System.Diagnostics.Trace.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/Trace-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/Trace-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Trace/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/Trace/Simple/Example.cs" />
     /// </example>
     [Target("Trace")]
-    public sealed class TraceTarget : TargetWithLayout
+    [Target("TraceSystem")]
+    public sealed class TraceTarget : TargetWithLayoutHeaderAndFooter
     {
         /// <summary>
-        /// Always use <see cref="Trace.WriteLine(string)"/> independent of <see cref="LogLevel"/>
+        /// Force use <see cref="Trace.WriteLine(string)"/> independent of <see cref="LogLevel"/>
         /// </summary>
         /// <docgen category='Output Options' order='100' />
-        [DefaultValue(false)]
         public bool RawWrite { get; set; }
 
         /// <summary>
@@ -76,7 +74,6 @@ namespace NLog.Targets
         /// Trace.Fail can have special side-effects, and give fatal exceptions, message dialogs or Environment.FailFast
         /// </remarks>
         /// <docgen category='Output Options' order='100' />
-        [DefaultValue(false)]
         public bool EnableTraceFail { get; set; }
 
         /// <summary>
@@ -87,7 +84,6 @@ namespace NLog.Targets
         /// </remarks>
         public TraceTarget() : base()
         {
-            OptimizeBufferReuse = true;
         }
 
         /// <summary>
@@ -100,6 +96,28 @@ namespace NLog.Targets
         public TraceTarget(string name) : this()
         {
             Name = name;
+        }
+
+        /// <inheritdoc/>
+        protected override void InitializeTarget()
+        {
+            base.InitializeTarget();
+
+            if (Header != null)
+            {
+                Trace.WriteLine(RenderLogEvent(Footer, LogEventInfo.CreateNullEvent()));
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void CloseTarget()
+        {
+            if (Footer != null)
+            {
+                Trace.WriteLine(RenderLogEvent(Footer, LogEventInfo.CreateNullEvent()));
+            }
+
+            base.CloseTarget();
         }
 
         /// <summary>

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,18 +31,16 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using System.Linq;
-using System.Reflection;
-using System.Text.RegularExpressions;
-using NLog.Common;
-using NLog.Config;
-using Xunit.Extensions;
-
 namespace NLog.UnitTests.Config
 {
+    using System;
+    using System.Linq;
+    using System.Reflection;
+    using System.Text.RegularExpressions;
     using System.IO;
     using MyExtensionNamespace;
+    using NLog.Common;
+    using NLog.Config;
     using NLog.Filters;
     using NLog.Layouts;
     using NLog.Targets;
@@ -66,11 +64,9 @@ namespace NLog.UnitTests.Config
         [Fact]
         public void ExtensionTest1()
         {
-            LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
-
             Assert.NotNull(typeof(FooLayout));
 
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var configuration = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
     <extensions>
         <add assemblyFile='" + GetExtensionAssemblyFullPath() + @"' />
@@ -88,11 +84,11 @@ namespace NLog.UnitTests.Config
     <rules>
       <logger name='*' writeTo='t'>
         <filters>
-           <whenFoo x='44' action='Ignore' />
+           <whenFoo x='44' action='Log' />
         </filters>
       </logger>
     </rules>
-</nlog>");
+</nlog>").LogFactory.Configuration;
 
             Target myTarget = configuration.FindTargetByName("t");
             Assert.Equal("MyExtensionNamespace.MyTarget", myTarget.GetType().FullName);
@@ -113,9 +109,7 @@ namespace NLog.UnitTests.Config
         [Fact]
         public void ExtensionTest2()
         {
-            LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
-
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var configuration = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
     <extensions>
         <add assembly='" + extensionAssemblyName1 + @"' />
@@ -138,7 +132,7 @@ namespace NLog.UnitTests.Config
         </filters>
       </logger>
     </rules>
-</nlog>");
+</nlog>").LogFactory.Configuration;
 
             Target myTarget = configuration.FindTargetByName("t");
             Assert.Equal("MyExtensionNamespace.MyTarget", myTarget.GetType().FullName);
@@ -162,9 +156,7 @@ namespace NLog.UnitTests.Config
         [Fact]
         public void ExtensionWithPrefixTest()
         {
-            LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
-
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var configuration = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
     <extensions>
         <add prefix='myprefix' assemblyFile='" + GetExtensionAssemblyFullPath() + @"' />
@@ -182,11 +174,11 @@ namespace NLog.UnitTests.Config
     <rules>
       <logger name='*' writeTo='t'>
         <filters>
-           <myprefix.whenFoo x='44' action='Ignore' />
+           <myprefix.whenFoo x='44' action='Log' />
         </filters>
       </logger>
     </rules>
-</nlog>");
+</nlog>").LogFactory.Configuration;
 
             Target myTarget = configuration.FindTargetByName("t");
             Assert.Equal("MyExtensionNamespace.MyTarget", myTarget.GetType().FullName);
@@ -209,9 +201,7 @@ namespace NLog.UnitTests.Config
         {
             Assert.NotNull(typeof(FooLayout));
 
-            LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
-
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var configuration = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
     <extensions>
         <add type='" + typeof(MyTarget).AssemblyQualifiedName + @"' />
@@ -232,11 +222,11 @@ namespace NLog.UnitTests.Config
     <rules>
       <logger name='*' writeTo='t'>
         <filters>
-           <whenFoo x='44' action='Ignore' />
+           <whenFoo x='44' action='Log' />
         </filters>
       </logger>
     </rules>
-</nlog>");
+</nlog>").LogFactory.Configuration;
 
             Target myTarget = configuration.FindTargetByName("t");
             Assert.Equal("MyExtensionNamespace.MyTarget", myTarget.GetType().FullName);
@@ -259,9 +249,7 @@ namespace NLog.UnitTests.Config
         {
             Assert.NotNull(typeof(FooLayout));
 
-            LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
-
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var configuration = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
     
     <targets>
@@ -276,7 +264,7 @@ namespace NLog.UnitTests.Config
     <rules>
       <logger name='*' writeTo='t'>
         <filters>
-           <whenFoo x='44' action='Ignore' />
+           <whenFoo x='44' action='Log' />
         </filters>
       </logger>
     </rules>
@@ -285,7 +273,7 @@ namespace NLog.UnitTests.Config
         <add assemblyFile='" + GetExtensionAssemblyFullPath() + @"' />
     </extensions>
 
-</nlog>");
+</nlog>").LogFactory.Configuration;
 
             Target myTarget = configuration.FindTargetByName("t");
             Assert.Equal("MyExtensionNamespace.MyTarget", myTarget.GetType().FullName);
@@ -393,34 +381,42 @@ namespace NLog.UnitTests.Config
         [Fact]
         public void Extension_should_be_auto_loaded_when_following_NLog_dll_format()
         {
-            try
-            {
-                var fileLocations = ConfigurationItemFactory.GetAutoLoadingFileLocations().ToArray();
-                Assert.NotEmpty(fileLocations);
-                Assert.NotNull(fileLocations[0].Key);
-                Assert.NotNull(fileLocations[0].Value); // Primary search location is NLog-assembly
-                Assert.Equal(fileLocations.Length, fileLocations.Select(f => f.Key).Distinct().Count());
+            var fileLocations = ConfigurationItemFactory.GetAutoLoadingFileLocations().ToArray();
+            Assert.NotEmpty(fileLocations);
+            Assert.NotNull(fileLocations[0].Key);
+            Assert.NotNull(fileLocations[0].Value); // Primary search location is NLog-assembly
+            Assert.Equal(fileLocations.Length, fileLocations.Select(f => f.Key).Distinct().Count());
 
-                var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
+<nlog throwExceptions='true' autoLoadExtensions='true'>
+<targets>
+    <target name='t' type='AutoLoadTarget' />
+</targets>
+
+<rules>
+    <logger name='*' writeTo='t' />
+</rules>
+</nlog>").LogFactory;
+
+            var autoLoadedTarget = logFactory.Configuration.FindTargetByName("t");
+            Assert.Equal("NLogAutloadExtension.AutoLoadTarget", autoLoadedTarget.GetType().ToString());
+        }
+
+        [Fact]
+        public void ExtensionTypeWithAssemblyNameCanLoad()
+        {
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
-    <targets>
-        <target name='t' type='AutoLoadTarget' />
-    </targets>
+<targets>
+    <target name='t' type='AutoLoadTarget,  NLogAutoLoadExtension' />
+</targets>
+<rules>
+    <logger name='*' writeTo='t' />
+</rules>
+</nlog>").LogFactory;
 
-    <rules>
-      <logger name='*' writeTo='t'>
-      </logger>
-    </rules>
-</nlog>");
-
-                var autoLoadedTarget = configuration.FindTargetByName("t");
-                Assert.Equal("NLogAutloadExtension.AutoLoadTarget", autoLoadedTarget.GetType().FullName);
-            }
-            finally
-            {
-                ConfigurationItemFactory.Default.Clear();
-                LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
-            }
+            var autoLoadedTarget = logFactory.Configuration.FindTargetByName("t");
+            Assert.Equal("NLogAutloadExtension.AutoLoadTarget", autoLoadedTarget.GetType().ToString());
         }
 
         [Theory]
@@ -428,6 +424,7 @@ namespace NLog.UnitTests.Config
         [InlineData(false)]
         public void Extension_loading_could_be_canceled(bool cancel)
         {
+            ConfigurationItemFactory.Default = null;
 
             EventHandler<AssemblyLoadingEventArgs> onAssemblyLoading = (sender, e) =>
             {
@@ -439,26 +436,22 @@ namespace NLog.UnitTests.Config
 
             try
             {
-                LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
                 ConfigurationItemFactory.AssemblyLoading += onAssemblyLoading;
 
-                using(new NoThrowNLogExceptions())
+                using (new NoThrowNLogExceptions())
                 {
-                    LogManager.ThrowExceptions = true;
-
-                    var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
-<nlog throwExceptions='false'>
+                    var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
+<nlog throwExceptions='false' autoLoadExtensions='true'>
     <targets>
         <target name='t' type='AutoLoadTarget' />
     </targets>
 
     <rules>
-      <logger name='*' writeTo='t'>
-      </logger>
+      <logger name='*' writeTo='t' />
     </rules>
-</nlog>");
+</nlog>").LogFactory;
 
-                    var autoLoadedTarget = configuration.FindTargetByName("t");
+                    var autoLoadedTarget = logFactory.Configuration.FindTargetByName("t");
 
                     if (cancel)
                     {
@@ -466,7 +459,7 @@ namespace NLog.UnitTests.Config
                     }
                     else
                     {
-                        Assert.Equal("NLogAutloadExtension.AutoLoadTarget", autoLoadedTarget.GetType().FullName);
+                        Assert.Equal("NLogAutloadExtension.AutoLoadTarget", autoLoadedTarget.GetType().ToString());
                     }
                 }
             }
@@ -474,8 +467,6 @@ namespace NLog.UnitTests.Config
             {
                 //cleanup
                 ConfigurationItemFactory.AssemblyLoading -= onAssemblyLoading;
-                ConfigurationItemFactory.Default.Clear();
-                LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
             }
         }
 
@@ -484,16 +475,11 @@ namespace NLog.UnitTests.Config
         {
             try
             {
-
                 var writer = new StringWriter();
                 InternalLogger.LogWriter = writer;
                 InternalLogger.LogLevel = LogLevel.Debug;
-                LogManager.LogFactory.ServiceRepository = new ServiceRepositoryInternal(true);
 
-                var fact = ConfigurationItemFactory.Default;
-
-                //also throw exceptions 
-                LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+                var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
 <nlog throwExceptions='true'>
 <extensions>
  <add assembly='PackageLoaderTestAssembly' />
@@ -510,7 +496,6 @@ namespace NLog.UnitTests.Config
 
                 //4 times successful
                 Assert.Equal(4, Regex.Matches(logs, Regex.Escape("Preload successfully invoked for '")).Count);
-
             }
             finally
             {
@@ -544,18 +529,7 @@ namespace NLog.UnitTests.Config
         {
             try
             {
-                // ...\NLog\tests\NLog.UnitTests\bin\Debug\netcoreapp2.0\nlog.dll
-                var nlogDirectory = new DirectoryInfo(ConfigurationItemFactory.GetAutoLoadingFileLocations().First().Key);
-                var configurationDirectory = nlogDirectory.Parent;
-                var testsDirectory = configurationDirectory.Parent.Parent.Parent;
-                var manuallyLoadedAssemblyPath = Path.Combine(testsDirectory.FullName, "ManuallyLoadedExtension", "bin", configurationDirectory.Name,
-#if NETSTANDARD
-                    "netstandard2.0",
-#else
-                    nlogDirectory.Name,
-#endif
-                    "ManuallyLoadedExtension.dll");
-                Assembly.LoadFrom(manuallyLoadedAssemblyPath);
+                LoadManuallyLoadedExtensionDll();
 
                 InternalLogger.LogLevel = LogLevel.Trace;
                 var writer = new StringWriter();
@@ -564,7 +538,7 @@ namespace NLog.UnitTests.Config
                 var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
 <nlog throwExceptions='true'>
     <extensions>
-        <add assembly='ManuallyLoadedExtension' />
+        <add assembly='Manually-Loaded-Extension' />
     </extensions>
 
     <targets>
@@ -575,7 +549,7 @@ namespace NLog.UnitTests.Config
                 // We get Exception for normal Assembly-Load only in net452.
 #if !NETSTANDARD && !MONO
                 var logs = writer.ToString();
-                Assert.Contains("Try find 'ManuallyLoadedExtension' in current domain", logs);
+                Assert.Contains("Try find 'Manually-Loaded-Extension' in current domain", logs);
 #endif
 
                 // Was AssemblyLoad successful?
@@ -586,6 +560,72 @@ namespace NLog.UnitTests.Config
             {
                 InternalLogger.Reset();
             }
+        }
+
+        [Fact]
+        public void FullyQualifiedExtensionTest()
+        {
+            // Arrange
+
+            LoadManuallyLoadedExtensionDll();
+
+            // Act
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"<nlog throwConfigExceptions='true'>
+                <targets>
+                    <target name='t' type='ManuallyLoadedTarget, Manually-Loaded-Extension' />
+                </targets>
+            </nlog>").LogFactory;
+
+
+            // Assert
+            Assert.NotNull(logFactory.Configuration.FindTargetByName("t"));
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData("", null)]
+        [InlineData("ManuallyLoadedTarget", "ManuallyLoadedExtension.ManuallyLoadedTarget")]
+        [InlineData("ManuallyLoaded-Target", "ManuallyLoadedExtension.ManuallyLoadedTarget")]
+        [InlineData("ManuallyLoadedTarget, Manually-Loaded-Extension", "ManuallyLoadedExtension.ManuallyLoadedTarget")]
+        [InlineData("ManuallyLoaded-Target, Manually-Loaded-Extension", "ManuallyLoadedExtension.ManuallyLoadedTarget")]
+        [InlineData(", Manually-Loaded-Extension", null)] // border case
+        [InlineData("ManuallyLoadedTarget,", null)] // border case
+        public void NormalizeNameTest(string input, string expected)
+        {
+            // Arrange
+            var assembly = LoadManuallyLoadedExtensionDll();
+            var configFactory = new ConfigurationItemFactory(assembly);
+
+            // Act
+            var foundDefinition = configFactory.Targets.TryGetDefinition(input, out var outputDefinition);
+            var foundInstance = configFactory.Targets.TryCreateInstance(input, out var outputInstance);
+            var instance = (foundDefinition || foundInstance || expected != null) ? configFactory.Targets.CreateInstance(input) : null;
+
+            // Assert
+            Assert.Equal(expected != null, foundInstance);
+            Assert.Equal(expected != null, foundDefinition);
+            Assert.Equal(expected, instance?.GetType().ToString());
+            Assert.Equal(expected, outputInstance?.GetType().ToString());
+            Assert.Equal(expected, outputDefinition?.ToString());
+        }
+
+        private static Assembly LoadManuallyLoadedExtensionDll()
+        {
+            // ...\NLog\tests\NLog.UnitTests\bin\Debug\netcoreapp2.0\nlog.dll
+            var nlogDirectory = new DirectoryInfo(ConfigurationItemFactory.GetAutoLoadingFileLocations().First().Key);
+            var configurationDirectory = nlogDirectory.Parent;
+            var testsDirectory = configurationDirectory.Parent.Parent.Parent;
+            var manuallyLoadedAssemblyPath = Path.Combine(testsDirectory.FullName, "ManuallyLoadedExtension", "bin", configurationDirectory.Name,
+#if NETSTANDARD
+                    "netstandard2.0",
+#elif NET35 || NET40 || NET45
+                    "net461",
+#else
+                nlogDirectory.Name,
+#endif
+                "Manually-Loaded-Extension.dll");
+            return Assembly.LoadFrom(manuallyLoadedAssemblyPath);
+
         }
     }
 }

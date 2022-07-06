@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,21 +34,19 @@
 namespace NLog.LayoutRenderers
 {
     using System.Text;
-    using NLog.Common;
     using NLog.Config;
     using NLog.Layouts;
 
     /// <summary>
-    /// Render a NLog variable (xml or config)
+    /// Render a NLog Configuration variable assigned from API or loaded from config-file
     /// </summary>
     [LayoutRenderer("var")]
-    [ThreadSafe]
     public class VariableLayoutRenderer : LayoutRenderer
     {
         /// <summary>
         /// Gets or sets the name of the NLog variable.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [RequiredParameter]
         [DefaultParameter]
         public string Name { get; set; }
@@ -57,52 +55,38 @@ namespace NLog.LayoutRenderers
         /// Gets or sets the default value to be used when the variable is not set.
         /// </summary>
         /// <remarks>Not used if Name is <c>null</c></remarks>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public string Default { get; set; }
 
         /// <summary>
-        /// Initializes the layout renderer.
+        /// Gets the configuration variable layout matching the configured Name
         /// </summary>
+        /// <remarks>Mostly relevant for the scanning of active NLog Layouts (Ex. CallSite capture)</remarks>
+        public Layout ActiveLayout => TryGetLayout(out var layout) ? layout : null;
+
+        /// <inheritdoc/>
         protected override void InitializeLayoutRenderer()
         {
             if (TryGetLayout(out var layout) && layout != null)
             {
                 //pass loggingConfiguration to layout
                 layout.Initialize(LoggingConfiguration);
-                if (!layout.ThreadSafe)
-                {
-                    if (layout is SimpleLayout)
-                    {
-                        InternalLogger.Warn("${{var={0}}} should be declared as <variable name=\"var_{0}\" value=\"...\" /> and used like this ${{var_{0}}}. Because of layout isn't thread safe. Layout={1}", Name, layout);
-                    }
-                    else
-                    {
-                        InternalLogger.Warn("${{var={0}}} is not thread safe. This could lead to unexpected results when two targets use the same layout", Name);
-                    }
-                }
             }
 
             base.InitializeLayoutRenderer();
         }
 
         /// <summary>
-        /// Try get the 
+        /// Try lookup the configuration variable layout matching the configured Name
         /// </summary>
-        /// <param name="layout"></param>
-        /// <returns></returns>
         private bool TryGetLayout(out Layout layout)
         {
             layout = null;
             //Note: don't use LogManager (locking, recursion)
-            return Name != null && LoggingConfiguration?.Variables?.TryGetValue(Name, out layout) == true;
+            return Name != null && LoggingConfiguration?.TryLookupDynamicVariable(Name, out layout) == true;
         }
 
-
-        /// <summary>
-        /// Renders the specified variable and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             if (Name != null)
@@ -110,7 +94,7 @@ namespace NLog.LayoutRenderers
                 if (TryGetLayout(out var layout))
                 {
                     //ignore NULL, but it set, so don't use default.
-                    layout?.RenderAppendBuilder(logEvent, builder);
+                    layout?.Render(logEvent, builder);
                 }
                 else if (Default != null)
                 {

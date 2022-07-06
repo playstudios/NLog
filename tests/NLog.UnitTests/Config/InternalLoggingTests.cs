@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,14 +31,13 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using System.IO;
-using System.Text;
-using NLog.Config;
-
 namespace NLog.UnitTests.Config
 {
+    using System;
+    using System.IO;
+    using System.Text;
     using NLog.Common;
+    using NLog.Config;
     using Xunit;
 
     public class InternalLoggingTests : NLogTestBase
@@ -128,7 +127,7 @@ namespace NLog.UnitTests.Config
             var internalLogToConsoleErrorString = logToConsoleError.ToString().ToLower();
             var globalThresholdString = globalThreshold.ToString();
             var throwExceptionsString = throwExceptions.ToString().ToLower();
-            var throwConfigExceptionsString = throwConfigExceptions == null ? "" : throwConfigExceptions.ToString().ToLower();
+            var throwConfigExceptionsString = throwConfigExceptions?.ToString().ToLower() ?? string.Empty;
             var logToTraceString = logToTrace.ToString().ToLower();
             var autoShutdownString = autoShutdown.ToString().ToLower();
 

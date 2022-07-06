@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,7 +42,7 @@ namespace NLog.Internal
     /// <summary>
     /// Helpers for <see cref="string"/>.
     /// </summary>
-    public static class StringHelpers
+    internal static class StringHelpers
     {
         /// <summary>
         /// IsNullOrWhiteSpace, including for .NET 3.5
@@ -52,13 +52,12 @@ namespace NLog.Internal
         [ContractAnnotation("value:null => true")]
         internal static bool IsNullOrWhiteSpace(string value)
         {
-#if NET3_5
-
-            if (value == null) return true;
+#if !NET35
+            return string.IsNullOrWhiteSpace(value);
+#else
+            if (value is null) return true;
             if (value.Length == 0) return true;
             return String.IsNullOrEmpty(value.Trim());
-#else
-            return string.IsNullOrWhiteSpace(value);
 #endif
         }
 
@@ -92,12 +91,12 @@ namespace NLog.Internal
         /// <returns>The same reference of nothing has been replaced.</returns>
         public static string Replace([NotNull] string str, [NotNull] string oldValue, string newValue, StringComparison comparison)
         {
-            if (str == null)
+            if (str is null)
             {
                 throw new ArgumentNullException(nameof(str));
             }
 
-            if (oldValue == null)
+            if (oldValue is null)
             {
                 throw new ArgumentNullException(nameof(oldValue));
             }
@@ -135,7 +134,7 @@ namespace NLog.Internal
                 index = str.IndexOf(oldValue, index, comparison);
             }
 
-            if (sb == null)
+            if (sb is null)
             {
                 //nothing replaced
                 return str;
@@ -152,12 +151,12 @@ namespace NLog.Internal
         /// <summary>Concatenates all the elements of a string array, using the specified separator between each element. </summary>
         /// <param name="separator">The string to use as a separator. <paramref name="separator" /> is included in the returned string only if <paramref name="values" /> has more than one element.</param>
         /// <param name="values">An collection that contains the elements to concatenate. </param>
-        /// <returns>A string that consists of the elements in <paramref name="values" /> delimited by the <paramref name="separator" /> string. If <paramref name="values" /> is an empty array, the method returns <see cref="F:System.String.Empty" />.</returns>
-        /// <exception cref="T:System.ArgumentNullException">
+        /// <returns>A string that consists of the elements in <paramref name="values" /> delimited by the <paramref name="separator" /> string. If <paramref name="values" /> is an empty array, the method returns <see cref="System.String.Empty" />.</returns>
+        /// <exception cref="System.ArgumentNullException">
         /// <paramref name="values" /> is <see langword="null" />. </exception>
         internal static string Join(string separator, IEnumerable<string> values)
         {
-#if NETSTANDARD || NET4_5 || NET4_0
+#if !NET35
             return string.Join(separator, values);
 #else
             return string.Join(separator, values.ToArray());

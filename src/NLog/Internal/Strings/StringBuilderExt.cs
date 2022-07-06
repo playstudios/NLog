@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -193,11 +193,22 @@ namespace NLog.Internal
         /// <param name="builder"></param>
         public static void ClearBuilder(this StringBuilder builder)
         {
-#if !NET3_5
-            builder.Clear();
+            try
+            {
+#if !NET35
+                builder.Clear();
 #else
-            builder.Length = 0;
+                builder.Length = 0;
 #endif
+            }
+            catch
+            {
+                // Default StringBuilder Clear() can cause the StringBuilder to re-allocate new internal char-array
+                // This can fail in low memory conditions when StringBuilder is big, so instead try to clear the StringBuilder "gently"
+                if (builder.Length > 1)
+                    builder.Remove(0, builder.Length - 1);
+                builder.Remove(0, builder.Length);
+            }
         }
 
         /// <summary>
@@ -209,29 +220,21 @@ namespace NLog.Internal
         /// <param name="transformBuffer">Helper char-buffer to minimize memory allocations</param>
         public static void CopyToStream(this StringBuilder builder, MemoryStream ms, Encoding encoding, char[] transformBuffer)
         {
-            if (transformBuffer != null)
+            int charCount;
+            int byteCount = encoding.GetMaxByteCount(builder.Length);
+            long position = ms.Position;
+            ms.SetLength(position + byteCount);
+            for (int i = 0; i < builder.Length; i += transformBuffer.Length)
             {
-                int charCount;
-                int byteCount = encoding.GetMaxByteCount(builder.Length);
-                ms.SetLength(ms.Position + byteCount);
-                for (int i = 0; i < builder.Length; i += transformBuffer.Length)
-                {
-                    charCount = Math.Min(builder.Length - i, transformBuffer.Length);
-                    builder.CopyTo(i, transformBuffer, 0, charCount);
-                    byteCount = encoding.GetBytes(transformBuffer, 0, charCount, ms.GetBuffer(), (int)ms.Position);
-                    ms.Position += byteCount;
-                }
-                if (ms.Position != ms.Length)
-                {
-                    ms.SetLength(ms.Position);
-                }
+                charCount = Math.Min(builder.Length - i, transformBuffer.Length);
+                builder.CopyTo(i, transformBuffer, 0, charCount);
+                byteCount = encoding.GetBytes(transformBuffer, 0, charCount, ms.GetBuffer(), (int)position);
+                position += byteCount;
             }
-            else
+            ms.Position = position;
+            if (position != ms.Length)
             {
-                // Faster than MemoryStream, but generates garbage
-                var str = builder.ToString();
-                byte[] bytes = encoding.GetBytes(str);
-                ms.Write(bytes, 0, bytes.Length);
+                ms.SetLength(position);
             }
         }
 
@@ -385,9 +388,9 @@ namespace NLog.Internal
         }
 
         /// <summary>
-        /// Append a int type (byte, int) as string
+        /// Append a numeric type (byte, int, double, decimal) as string
         /// </summary>
-        internal static void AppendIntegerAsString(this StringBuilder sb, IConvertible value, TypeCode objTypeCode)
+        internal static void AppendNumericInvariant(this StringBuilder sb, IConvertible value, TypeCode objTypeCode)
         {
             switch (objTypeCode)
             {
@@ -415,9 +418,74 @@ namespace NLog.Internal
                             sb.Append(uint64);
                     }
                     break;
+                case TypeCode.Single:
+                    {
+                        float floatValue = value.ToSingle(CultureInfo.InvariantCulture);
+                        AppendFloatInvariant(sb, floatValue);
+                    }
+                    break;
+                case TypeCode.Double:
+                    {
+                        double doubleValue = value.ToDouble(CultureInfo.InvariantCulture);
+                        AppendDoubleInvariant(sb, doubleValue);
+                    }
+                    break;
+                case TypeCode.Decimal:
+                    {
+                        decimal decimalValue = value.ToDecimal(CultureInfo.InvariantCulture);
+                        AppendDecimalInvariant(sb, decimalValue);
+                    }
+                    break;
                 default:
                     sb.Append(XmlHelper.XmlConvertToString(value, objTypeCode));
                     break;
+            }
+        }
+
+        private static void AppendDecimalInvariant(StringBuilder sb, decimal decimalValue)
+        {
+            if (Math.Truncate(decimalValue) == decimalValue && decimalValue > int.MinValue && decimalValue < int.MaxValue)
+            {
+                sb.AppendInvariant(Convert.ToInt32(decimalValue));
+                sb.Append(".0");
+            }
+            else
+            {
+                sb.Append(XmlHelper.XmlConvertToString(decimalValue));
+            }
+        }
+
+        private static void AppendDoubleInvariant(StringBuilder sb, double doubleValue)
+        {
+            if (double.IsNaN(doubleValue) || double.IsInfinity(doubleValue))
+            {
+                sb.Append(XmlHelper.XmlConvertToString(doubleValue));
+            }
+            else if (Math.Truncate(doubleValue) == doubleValue && doubleValue > int.MinValue && doubleValue < int.MaxValue)
+            {
+                sb.AppendInvariant(Convert.ToInt32(doubleValue));
+                sb.Append(".0");
+            }
+            else
+            {
+                sb.Append(XmlHelper.XmlConvertToString(doubleValue));
+            }
+        }
+
+        private static void AppendFloatInvariant(StringBuilder sb, float floatValue)
+        {
+            if (float.IsNaN(floatValue) || float.IsInfinity(floatValue))
+            {
+                sb.Append(XmlHelper.XmlConvertToString(floatValue));
+            }
+            else if (Math.Truncate(floatValue) == floatValue && floatValue > int.MinValue && floatValue < int.MaxValue)
+            {
+                sb.AppendInvariant(Convert.ToInt32(floatValue));
+                sb.Append(".0");
+            }
+            else
+            {
+                sb.Append(XmlHelper.XmlConvertToString(floatValue));
             }
         }
 

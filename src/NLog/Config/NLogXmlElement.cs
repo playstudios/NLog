@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -116,7 +116,7 @@ namespace NLog.Config
                         return Children.Where(item => !SingleValueElement(item)).Cast<ILoggingConfigurationElement>();
                 }
 
-                return NLog.Internal.ArrayHelper.Empty<ILoggingConfigurationElement>();
+                return ArrayHelper.Empty<ILoggingConfigurationElement>();
             }
         }
 
@@ -125,7 +125,7 @@ namespace NLog.Config
         /// </summary>
         /// <param name="elementName">Name of the element.</param>
         /// <returns>Children elements with the specified element name.</returns>
-        public IEnumerable<NLogXmlElement> Elements(string elementName)
+        public List<NLogXmlElement> FilterChildren(string elementName)
         {
             var result = new List<NLogXmlElement>();
 
@@ -154,12 +154,12 @@ namespace NLog.Config
                 }
             }
 
-            throw new InvalidOperationException("Assertion failed. Expected element name '" + string.Join("|", allowedNames) + "', actual: '" + LocalName + "'.");
+            throw new InvalidOperationException($"Assertion failed. Expected element name '{string.Join("|", allowedNames)}', actual: '{LocalName}'.");
         }
 
-        private void Parse(XmlReader reader, bool topElement, out IList<KeyValuePair<string,string>> attributes, out IList<NLogXmlElement> children)
+        private void Parse(XmlReader reader, bool nestedElement, out IList<KeyValuePair<string,string>> attributes, out IList<NLogXmlElement> children)
         {
-            ParseAttributes(reader, topElement, out attributes);
+            ParseAttributes(reader, nestedElement, out attributes);
 
             LocalName = reader.LocalName;
 
@@ -179,11 +179,12 @@ namespace NLog.Config
                         Value += reader.Value;
                         continue;
                     }
-
+                    
                     if (reader.NodeType == XmlNodeType.Element)
                     {
                         children = children ?? new List<NLogXmlElement>();
-                        children.Add(new NLogXmlElement(reader, true));
+                        var nestedChild = nestedElement || !string.Equals(reader.LocalName, "nlog", StringComparison.OrdinalIgnoreCase);
+                        children.Add(new NLogXmlElement(reader, nestedChild));
                     }
                 }
             }
@@ -216,11 +217,18 @@ namespace NLog.Config
         {
             if (reader.LocalName?.Equals("xmlns", StringComparison.OrdinalIgnoreCase) == true)
                 return true;
+            if (reader.LocalName?.Equals("schemaLocation", StringComparison.OrdinalIgnoreCase) == true && !StringHelpers.IsNullOrWhiteSpace(reader.Prefix))
+                return true;
             if (reader.Prefix?.Equals("xsi", StringComparison.OrdinalIgnoreCase) == true)
                 return true;
             if (reader.Prefix?.Equals("xmlns", StringComparison.OrdinalIgnoreCase) == true)
                 return true;
             return false;
+        }
+
+        public override string ToString()
+        {
+            return Name;
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,22 +33,19 @@
 
 namespace NLog.Targets
 {
-    using System.ComponentModel;
-
     /// <summary>
     /// Discards log messages. Used mainly for debugging and benchmarking.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/Null-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/Null-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Null/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
@@ -61,7 +58,6 @@ namespace NLog.Targets
         /// Gets or sets a value indicating whether to perform layout calculation.
         /// </summary>
         /// <docgen category='Layout Options' order='10' />
-        [DefaultValue(false)]
         public bool FormatMessage { get; set; }
 
         /// <summary>
@@ -69,7 +65,6 @@ namespace NLog.Targets
         /// </summary>
         public NullTarget() : base()
         {
-            OptimizeBufferReuse = true;
         }
 
         /// <summary>

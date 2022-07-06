@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -43,19 +43,18 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("currentdir")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class CurrentDirLayoutRenderer : LayoutRenderer, IStringValueRenderer
     {
         /// <summary>
         /// Gets or sets the name of the file to be Path.Combine()'d with the current directory.
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
+        /// <docgen category='Advanced Options' order='50' />
         public string File { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the directory to be Path.Combine()'d with the current directory.
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
+        /// <docgen category='Advanced Options' order='50' />
         public string Dir { get; set; }
 
         /// <inheritdoc/>
@@ -64,7 +63,6 @@ namespace NLog.LayoutRenderers
             builder.Append(GetStringValue());
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => GetStringValue();
 
         private string GetStringValue()

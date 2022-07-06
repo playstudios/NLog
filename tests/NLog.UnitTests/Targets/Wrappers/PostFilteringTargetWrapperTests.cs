@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -206,7 +206,7 @@ namespace NLog.UnitTests.Targets.Wrappers
         [Fact]
         public void PostFilteringTargetWrapperOnlyDefaultFilter()
         {
-            var target = new MyTarget() { OptimizeBufferReuse = true };
+            var target = new MyTarget();
             var wrapper = new PostFilteringTargetWrapper()
             {
                 WrappedTarget = target,

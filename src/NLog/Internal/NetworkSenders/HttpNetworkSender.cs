@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.Internal.NetworkSenders
 {
     using System;
-    using System.Net;
 
     /// <summary>
     /// Network sender which uses HTTP or HTTPS POST.
@@ -76,16 +75,18 @@ namespace NLog.Internal.NetworkSenders
                         }
 
                         // completed fine
-                        base.EndRequest(asyncContinuation, null);
+                        CompleteRequest(asyncContinuation);
                     }
                     catch (Exception ex)
                     {
+#if DEBUG
                         if (ex.MustBeRethrownImmediately())
                         {
                             throw; // Throwing exceptions here will crash the entire application (.NET 2.0 behavior)
                         }
+#endif
 
-                        base.EndRequest(_ => asyncContinuation(ex), null);    // pendingException = null to keep sender alive
+                        CompleteRequest(_ => asyncContinuation(ex));
                     }
                 };
 
@@ -103,16 +104,27 @@ namespace NLog.Internal.NetworkSenders
                     }
                     catch (Exception ex)
                     {
+#if DEBUG
                         if (ex.MustBeRethrownImmediately())
                         {
                             throw;  // Throwing exceptions here will crash the entire application (.NET 2.0 behavior)
                         }
+#endif
 
-                        base.EndRequest(_ => asyncContinuation(ex), null);    // pendingException = null to keep sender alive
+                        CompleteRequest(_ => asyncContinuation(ex));
                     }
                 };
 
             webRequest.BeginGetRequestStream(onRequestStream, null);
+        }
+
+        private void CompleteRequest(Common.AsyncContinuation asyncContinuation)
+        {
+            var nextRequest = base.EndRequest(asyncContinuation, null);    // pendingException = null to keep sender alive
+            if (nextRequest.HasValue)
+            {
+                BeginRequest(nextRequest.Value);
+            }
         }
     }
 }

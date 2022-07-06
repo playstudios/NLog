@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -53,12 +53,7 @@ namespace NLog.Config
         /// <remarks>Avoid calling this while handling a LogEvent, since random deadlocks can occur.</remarks>
         public abstract object GetService(Type serviceType);
 
-        /// <summary>
-        /// Mapping of symbol name to actual <see cref="System.Type"/>
-        /// </summary>
-        public abstract ConfigurationItemFactory ConfigurationItemFactory { get; internal set; }
-
-        internal abstract ConfigurationItemCreator ConfigurationItemCreator { get; set; }
+        internal abstract bool TryGetService<T>(out T serviceInstance) where T : class;
 
         internal ServiceRepository()
         {

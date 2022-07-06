@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,20 +31,19 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Text;
-using NLog.Config;
-using NLog.Internal;
-
 namespace NLog.Layouts
 {
+    using System;
+    using System.Collections.Generic;
+    using System.ComponentModel;
+    using System.Text;
+    using NLog.Config;
+    using NLog.Internal;
+
     /// <summary>
     /// A specialized layout that renders XML-formatted events.
     /// </summary>
     [ThreadAgnostic]
-    [ThreadSafe]
     public abstract class XmlElementBase : Layout
     {
         private const string DefaultPropertyName = "property";
@@ -62,81 +61,95 @@ namespace NLog.Layouts
             LayoutWrapper.Inner = elementValue;
             Attributes = new List<XmlAttribute>();
             Elements = new List<XmlElement>();
-            ExcludeProperties = new HashSet<string>();
+            ExcludeProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
         /// Name of the XML element
         /// </summary>
         /// <remarks>Upgrade to private protected when using C# 7.2 </remarks>
-        /// <docgen category='XML Options' order='10' />
-        internal string ElementNameInternal { get => _elementName; set => _elementName = XmlHelper.XmlConvertToElementName(value?.Trim(), true); }
-        private string _elementName;
+        internal string ElementNameInternal { get => _elementNameInternal; set => _elementNameInternal = XmlHelper.XmlConvertToElementName(value?.Trim()); }
+        private string _elementNameInternal;
 
         /// <summary>
         /// Value inside the XML element
         /// </summary>
         /// <remarks>Upgrade to private protected when using C# 7.2 </remarks>
-        /// <docgen category='XML Options' order='10' />
         internal readonly LayoutRenderers.Wrappers.XmlEncodeLayoutRendererWrapper LayoutWrapper = new LayoutRenderers.Wrappers.XmlEncodeLayoutRendererWrapper();
 
         /// <summary>
         /// Auto indent and create new lines
         /// </summary>
-        /// <docgen category='XML Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='100' />
         public bool IndentXml { get; set; }
 
         /// <summary>
         /// Gets the array of xml 'elements' configurations.
         /// </summary>
-        /// <docgen category='XML Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [ArrayParameter(typeof(XmlElement), "element")]
         public IList<XmlElement> Elements { get; private set; }
 
         /// <summary>
         /// Gets the array of 'attributes' configurations for the element
         /// </summary>
-        /// <docgen category='XML Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [ArrayParameter(typeof(XmlAttribute), "attribute")]
         public IList<XmlAttribute> Attributes { get; private set; }
 
         /// <summary>
         /// Gets or sets whether a ElementValue with empty value should be included in the output
         /// </summary>
-        /// <docgen category='XML Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='100' />
         public bool IncludeEmptyValue { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsContext"/> dictionary.
-        /// </summary>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeMdc { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsLogicalContext"/> dictionary.
-        /// </summary>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeMdlc { get; set; }
 
         /// <summary>
         /// Gets or sets the option to include all properties from the log event (as XML)
         /// </summary>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeAllProperties { get; set; }
+        /// <docgen category='Layout Output' order='10' />
+        public bool IncludeEventProperties { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether to include the contents of the <see cref="ScopeContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeScopeProperties { get => _includeScopeProperties ?? (_includeMdlc == true || _includeMdc == true); set => _includeScopeProperties = value; }
+        private bool? _includeScopeProperties;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        [Obsolete("Replaced by IncludeScopeProperties. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool IncludeMdc { get => _includeMdc ?? false; set => _includeMdc = value; }
+        private bool? _includeMdc;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsLogicalContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        [Obsolete("Replaced by IncludeScopeProperties. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool IncludeMdlc { get => _includeMdlc ?? false; set => _includeMdlc = value; }
+        private bool? _includeMdlc;
+
+        /// <summary>
+        /// Gets or sets the option to include all properties from the log event (as XML)
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        [Obsolete("Replaced by IncludeEventProperties. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool IncludeAllProperties { get => IncludeEventProperties; set => IncludeEventProperties = value; }
 
         /// <summary>
         /// List of property names to exclude when <see cref="IncludeAllProperties"/> is true
         /// </summary>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
-#if NET3_5
-        public HashSet<string> ExcludeProperties { get; set; }
-#else
+        /// <docgen category='Layout Options' order='100' />
+#if !NET35
         public ISet<string> ExcludeProperties { get; set; }
+#else
+        public HashSet<string> ExcludeProperties { get; set; }
 #endif
 
         /// <summary>
@@ -147,7 +160,7 @@ namespace NLog.Layouts
         /// 
         /// Skips closing element tag when having configured <see cref="PropertiesElementValueAttribute"/>
         /// </remarks>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
+        /// <docgen category='Layout Options' order='100' />
         public string PropertiesElementName
         {
             get => _propertiesElementName;
@@ -156,7 +169,7 @@ namespace NLog.Layouts
                 _propertiesElementName = value;
                 _propertiesElementNameHasFormat = value?.IndexOf('{') >= 0;
                 if (!_propertiesElementNameHasFormat)
-                    _propertiesElementName = XmlHelper.XmlConvertToElementName(value?.Trim(), true);
+                    _propertiesElementName = XmlHelper.XmlConvertToElementName(value?.Trim());
             }
         }
         private string _propertiesElementName = DefaultPropertyName;
@@ -170,7 +183,7 @@ namespace NLog.Layouts
         /// <remarks>
         /// Will replace newlines in attribute-value with &#13;&#10;
         /// </remarks>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
+        /// <docgen category='Layout Options' order='100' />
         public string PropertiesElementKeyAttribute { get; set; } = DefaultPropertyKeyAttribute;
 
         /// <summary>
@@ -184,47 +197,36 @@ namespace NLog.Layouts
         ///
         /// Will replace newlines in attribute-value with &#13;&#10;
         /// </remarks>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
+        /// <docgen category='Layout Options' order='100' />
         public string PropertiesElementValueAttribute { get; set; }
 
         /// <summary>
         /// XML element name to use for rendering IList-collections items
         /// </summary>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
+        /// <docgen category='Layout Options' order='100' />
         public string PropertiesCollectionItemName { get; set; } = DefaultCollectionItemName;
 
         /// <summary>
         /// How far should the XML serializer follow object references before backing off
         /// </summary>
-        /// <docgen category='LogEvent Properties XML Options' order='10' />
+        /// <docgen category='Layout Options' order='100' />
         public int MaxRecursionLimit { get; set; } = 1;
 
-        private ObjectReflectionCache ObjectReflectionCache => _objectReflectionCache ?? (_objectReflectionCache = new ObjectReflectionCache(LoggingConfiguration.GetServiceResolver()));
+        private ObjectReflectionCache ObjectReflectionCache => _objectReflectionCache ?? (_objectReflectionCache = new ObjectReflectionCache(LoggingConfiguration.GetServiceProvider()));
         private ObjectReflectionCache _objectReflectionCache;
         private static readonly IEqualityComparer<object> _referenceEqualsComparer = SingleItemOptimizedHashSet<object>.ReferenceEqualityComparer.Default;
         private const int MaxXmlLength = 512 * 1024;
 
-        /// <summary>
-        /// Initializes the layout.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeLayout()
         {
             base.InitializeLayout();
 
-            if (IncludeMdc)
-            {
+            if (IncludeScopeProperties)
                 ThreadAgnostic = false;
-            }
 
-            if (IncludeMdlc)
-            {
-                ThreadAgnostic = false;
-            }
-
-            if (IncludeAllProperties)
-            {
+            if (IncludeEventProperties)
                 MutableUnsafe = true;
-            }
 
             if (Attributes.Count > 1)
             {
@@ -252,11 +254,7 @@ namespace NLog.Layouts
             PrecalculateBuilderInternal(logEvent, target);
         }
 
-        /// <summary>
-        /// Formats the log event as a XML document for writing.
-        /// </summary>
-        /// <param name="logEvent">The logging event.</param>
-        /// <param name="target"><see cref="StringBuilder"/> for the result</param>
+        /// <inheritdoc/>
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
             int orgLength = target.Length;
@@ -267,11 +265,7 @@ namespace NLog.Layouts
             }
         }
 
-        /// <summary>
-        /// Formats the log event as a XML document for writing.
-        /// </summary>
-        /// <param name="logEvent">The log event to be formatted.</param>
-        /// <returns>A XML string representation of the log event.</returns>
+        /// <inheritdoc/>
         protected override string GetFormattedMessage(LogEventInfo logEvent)
         {
             return RenderAllocateBuilder(logEvent);
@@ -355,13 +349,10 @@ namespace NLog.Layouts
             if (Elements.Count > 0)
                 return true;
 
-            if (IncludeMdc)
+            if (IncludeScopeProperties)
                 return true;
 
-            if (IncludeMdlc)
-                return true;
-
-            if (IncludeAllProperties && logEvent.HasProperties)
+            if (IncludeEventProperties && logEvent.HasProperties)
                 return true;
 
             return false;
@@ -369,31 +360,25 @@ namespace NLog.Layouts
 
         private void AppendLogEventXmlProperties(LogEventInfo logEventInfo, StringBuilder sb, int orgLength)
         {
-            if (IncludeMdc)
+            if (IncludeScopeProperties)
             {
-                foreach (string key in MappedDiagnosticsContext.GetNames())
+                using (var scopeEnumerator = ScopeContext.GetAllPropertiesEnumerator())
                 {
-                    if (string.IsNullOrEmpty(key))
-                        continue;
+                    while (scopeEnumerator.MoveNext())
+                    {
+                        var scopeProperty = scopeEnumerator.Current;
+                        if (string.IsNullOrEmpty(scopeProperty.Key))
+                            continue;
 
-                    object propertyValue = MappedDiagnosticsContext.GetObject(key);
-                    AppendXmlPropertyValue(key, propertyValue, sb, orgLength);
+                        if (ExcludeProperties.Contains(scopeProperty.Key))
+                            continue;
+
+                        AppendXmlPropertyValue(scopeProperty.Key, scopeProperty.Value, sb, orgLength);
+                    }
                 }
             }
 
-            if (IncludeMdlc)
-            {
-                foreach (string key in MappedDiagnosticsLogicalContext.GetNames())
-                {
-                    if (string.IsNullOrEmpty(key))
-                        continue;
-
-                    object propertyValue = MappedDiagnosticsLogicalContext.GetObject(key);
-                    AppendXmlPropertyValue(key, propertyValue, sb, orgLength);
-                }
-            }
-
-            if (IncludeAllProperties && logEventInfo.HasProperties)
+            if (IncludeEventProperties && logEventInfo.HasProperties)
             {
                 AppendLogEventProperties(logEventInfo, sb, orgLength);
             }
@@ -424,8 +409,8 @@ namespace NLog.Layouts
 
         private bool AppendXmlPropertyObjectValue(string propName, object propertyValue, StringBuilder sb, int orgLength, SingleItemOptimizedHashSet<object> objectsInPath, int depth, bool ignorePropertiesElementName = false)
         {
-            IConvertible convertibleValue = propertyValue as IConvertible;
-            TypeCode objTypeCode = propertyValue == null ? TypeCode.Empty : (convertibleValue?.GetTypeCode() ?? TypeCode.Object);
+            var convertibleValue = propertyValue as IConvertible;
+            var objTypeCode = convertibleValue?.GetTypeCode() ?? (propertyValue is null ? TypeCode.Empty : TypeCode.Object);
             if (objTypeCode != TypeCode.Object)
             {
                 string xmlValueString = XmlHelper.XmlConvertToString(convertibleValue, objTypeCode, true);
@@ -534,9 +519,9 @@ namespace NLog.Layouts
 
         private void AppendXmlObjectPropertyValues(string propName, ref ObjectReflectionCache.ObjectPropertyList propertyValues, StringBuilder sb, int orgLength, ref SingleItemOptimizedHashSet<object> objectsInPath, int depth, bool ignorePropertiesElementName = false)
         {
-            if (propertyValues.ConvertToString)
+            if (propertyValues.IsSimpleValue)
             {
-                AppendXmlPropertyValue(propName, propertyValues.ToString(), sb, orgLength, false, ignorePropertiesElementName);
+                AppendXmlPropertyValue(propName, propertyValues.ObjectValue, sb, orgLength, false, ignorePropertiesElementName);
             }
             else
             {
@@ -598,14 +583,14 @@ namespace NLog.Layouts
             string propNameElement;
             if (ignorePropertiesElementName)
             {
-                propNameElement = XmlHelper.XmlConvertToElementName(propName, true);
+                propNameElement = XmlHelper.XmlConvertToElementName(propName);
                 sb.Append(propNameElement);
             }
             else
             {
                 if (_propertiesElementNameHasFormat)
                 {
-                    propNameElement = XmlHelper.XmlConvertToElementName(propName, true);
+                    propNameElement = XmlHelper.XmlConvertToElementName(propName);
                     sb.AppendFormat(PropertiesElementName, propNameElement);
                 }
                 else
@@ -691,7 +676,7 @@ namespace NLog.Layouts
                 sb.Append("  ");
 
             int beforeValueLength = sb.Length;
-            xmlElement.RenderAppendBuilder(logEvent, sb);
+            xmlElement.Render(logEvent, sb);
             if (sb.Length == beforeValueLength && !xmlElement.IncludeEmptyValue)
                 return false;
 
@@ -716,9 +701,7 @@ namespace NLog.Layouts
             sb.Append(xmlKeyString);
             sb.Append("=\"");
 
-            int beforeValueLength = sb.Length;
-            xmlAttribute.LayoutWrapper.RenderAppendBuilder(logEvent, sb);
-            if (sb.Length == beforeValueLength && !xmlAttribute.IncludeEmptyValue)
+            if (!xmlAttribute.RenderAppendXmlValue(logEvent, sb))
                 return false;
 
             sb.Append('\"');
@@ -737,10 +720,7 @@ namespace NLog.Layouts
             RenderEndElement(sb, elementName);
         }
 
-        /// <summary>
-        /// Generate description of XML Layout
-        /// </summary>
-        /// <returns>XML Layout String Description</returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
             if (Elements.Count > 0)

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,10 +34,9 @@
 namespace NLog.UnitTests.Layouts
 {
     using System;
-    using System.Text;
-    using NLog.Config;
+    using System.Collections.Generic;
     using NLog.LayoutRenderers;
-    using NLog.Fluent;
+    using NLog.Targets;
     using Xunit;
 
     public class AllEventPropertiesTests : NLogTestBase
@@ -89,6 +88,42 @@ namespace NLog.UnitTests.Layouts
         }
 
         [Fact]
+        public void EventPropertyFormat()
+        {
+            var renderer = new AllEventPropertiesLayoutRenderer();
+            var ev = new LogEventInfo(LogLevel.Info, null, null, "{pi:0}", new object[] { 3.14159265359 });
+            var result = renderer.Render(ev);
+            Assert.Equal("pi=3", result);
+        }
+
+        [Fact]
+        public void StructuredLoggingProperties()
+        {
+            var renderer = new AllEventPropertiesLayoutRenderer();
+            var planetProperties = new System.Collections.Generic.Dictionary<string, object>()
+            {
+                { "Name", "Earth" },
+                { "PlanetType", "Water-world" },
+            };
+
+            var ev = new LogEventInfo(LogLevel.Info, null, null, "Hello Planet {@planet}", new object[] { planetProperties });
+            var result = renderer.Render(ev);
+            Assert.Equal(@"planet=""Name""=""Earth"", ""PlanetType""=""Water-world""", result);
+        }
+
+        [Fact]
+        public void IncludeScopeProperties()
+        {
+            var renderer = new AllEventPropertiesLayoutRenderer() { IncludeScopeProperties = true };
+            var ev = new LogEventInfo(LogLevel.Info, null, null, "{pi:0}", new object[] { 3.14159265359 });
+            using (ScopeContext.PushProperty("Figure", "Circle"))
+            {
+                var result = renderer.Render(ev);
+                Assert.Equal("pi=3, Figure=Circle", result);
+            }
+        }
+
+        [Fact]
         public void TestInvalidCustomFormatWithoutKeyPlaceholder()
         {
             var renderer = new AllEventPropertiesLayoutRenderer();
@@ -107,65 +142,79 @@ namespace NLog.UnitTests.Layouts
         [Fact]
         public void AllEventWithFluent_without_callerInformation()
         {
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
-                <nlog throwExceptions='true' >
-                    <targets>
-                        <target type='Debug'
-                                name='m'
-                                layout='${all-event-properties}'
-                                />
-                    </targets>
-                    <rules>
-                      <logger name='*' writeTo='m' />
-                    </rules>
-                </nlog>");
+            //Arrange
+            LogFactory logFactory = new LogFactory()
+                .Setup()
+                .LoadConfiguration(builder => 
+                { 
+                    builder.ForLogger().WriteTo(new DebugTarget("debug") { Layout = "${all-event-properties}" });
+                })
+                .LogFactory;
 
+            //Act
+            logFactory.GetCurrentClassLogger()
+                .WithProperty("Test", "InfoWrite")
+                .WithProperty("coolness", "200%")
+                .WithProperty("a", "not b")
+                .Debug("This is a test message '{0}'.", DateTime.Now.Ticks);
 
-            LogManager.Configuration = configuration;
-
-            var logger = LogManager.GetCurrentClassLogger();
-            logger.Debug()
-                .Message("This is a test fluent message '{0}'.", DateTime.Now.Ticks)
-                .Property("Test", "InfoWrite")
-                .Property("coolness", "200%")
-                .Property("a", "not b")
-                .Write();
-
-            AssertDebugLastMessage("m", "Test=InfoWrite, coolness=200%, a=not b");
+            //Assert
+            logFactory.AssertDebugLastMessage("Test=InfoWrite, coolness=200%, a=not b");
         }
 
-#if NET3_5 || NET4_0
-        [Fact(Skip = "NET3_5 + NET4_0 not supporting Caller-Attributes")]
+        [Fact]
+        public void WithPropertiesTest()
+        {
+            //Arrange
+            LogFactory logFactory = new LogFactory()
+                .Setup()
+                .LoadConfiguration(builder =>
+                {
+                    builder.ForLogger().WriteTo(new DebugTarget("debug") { Layout = "${all-event-properties}" });
+                })
+                .LogFactory;
+
+            Dictionary<string, object> properties = new Dictionary<string, object>()
+            {
+                {"TestString", "myString" },
+                {"TestInt", 999 }
+            };
+
+            //Act
+            logFactory.GetCurrentClassLogger()              
+                .WithProperties(properties)
+                .Debug("This is a test message '{0}'.", DateTime.Now.Ticks);
+
+            //Assert
+            logFactory.AssertDebugLastMessage("TestString=myString, TestInt=999");
+        }
+
+#if NET35 || NET40
+        [Fact(Skip = "NET35 not supporting Caller-Attributes")]
 #else
         [Fact]
 #endif
         public void AllEventWithFluent_with_callerInformation()
         {
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
-                <nlog throwExceptions='true' >
-                    <targets>
-                        <target type='Debug'
-                                name='m'
-                                layout='${all-event-properties}${callsite}'
-                                />
-                    </targets>
-                    <rules>
-                      <logger name='*' writeTo='m' />
-                    </rules>
-                </nlog>");
+            //Arrange
+            LogFactory logFactory = new LogFactory()
+                .Setup()
+                .LoadConfiguration(builder =>
+                {
+                    builder.ForLogger().WriteTo(new DebugTarget("debug") { Layout = "${all-event-properties}${callsite}" });
+                })
+                .LogFactory;
 
-            LogManager.Configuration = configuration;
+            //Act
+            logFactory.GetCurrentClassLogger()
+                .WithProperty("Test", "InfoWrite")
+                .WithProperty("coolness", "200%")
+                .WithProperty("a", "not b")
+                .Debug("This is a test message '{0}'.", DateTime.Now.Ticks);
 
-            var logger = LogManager.GetCurrentClassLogger();
-            logger.Debug()
-                .Message("This is a test fluent message '{0}'.", DateTime.Now.Ticks)
-                .Property("Test", "InfoWrite")
-                .Property("coolness", "200%")
-                .Property("a", "not b")
-                .Write();
-
-            AssertDebugLastMessageContains("m", nameof(AllEventWithFluent_with_callerInformation));
-            AssertDebugLastMessageContains("m", nameof(AllEventPropertiesTests));
+            //Assert
+            logFactory.AssertDebugLastMessageContains(nameof(AllEventWithFluent_with_callerInformation));
+            logFactory.AssertDebugLastMessageContains(nameof(AllEventPropertiesTests));
         }
 
         [Theory]
@@ -202,27 +251,26 @@ namespace NLog.UnitTests.Layouts
         public void ExcludeSingleProperty(string exclude, string result)
         {
             // Arrange
-            var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
-                <nlog throwExceptions='true' >
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
+                <nlog throwExceptions='true'>
                     <targets>
                         <target type='Debug'
-                                name='m'
+                                name='debug'
                                 layout='${all-event-properties:Exclude=" + exclude + @"}'
                                 />
                     </targets>
                     <rules>
-                      <logger name='*' writeTo='m' />
+                      <logger name='*' writeTo='debug' />
                     </rules>
-                </nlog>");
-            LogManager.Configuration = configuration;
-            var logger = LogManager.GetCurrentClassLogger();
+                </nlog>").LogFactory;
+            var logger = logFactory.GetCurrentClassLogger();
 
             // Act
             var ev = BuildLogEventWithProperties();
             logger.Log(ev);
 
             // Assert
-            AssertDebugLastMessageContains("m", result);
+            logFactory.AssertDebugLastMessageContains(result);
         }
 
         private static LogEventInfo BuildLogEventWithProperties()

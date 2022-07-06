@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
 
 namespace NLog.LayoutRenderers
 {
@@ -47,7 +47,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("specialfolder")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class SpecialFolderLayoutRenderer : LayoutRenderer
     {
         /// <summary>
@@ -66,7 +65,7 @@ namespace NLog.LayoutRenderers
         /// <li><b>System</b> - System directory</li>
         /// </ul>
         /// </remarks>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [DefaultParameter]
         public Environment.SpecialFolder Folder { get; set; }
 
@@ -82,11 +81,7 @@ namespace NLog.LayoutRenderers
         /// <docgen category='Advanced Options' order='10' />
         public string Dir { get; set; }
 
-        /// <summary>
-        /// Renders the directory where NLog is located and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             string basePath = Environment.GetFolderPath(Folder);

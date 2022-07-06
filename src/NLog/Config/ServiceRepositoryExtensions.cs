@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -40,14 +40,84 @@ namespace NLog.Config
 
     internal static class ServiceRepositoryExtensions
     {
-        internal static IServiceProvider GetServiceResolver(this LoggingConfiguration loggingConfiguration)
+        internal static ServiceRepository GetServiceProvider([CanBeNull] this LoggingConfiguration loggingConfiguration)
         {
             return loggingConfiguration?.LogFactory?.ServiceRepository ?? LogManager.LogFactory.ServiceRepository;
         }
 
-        public static T ResolveService<T>(this IServiceProvider serviceProvider) where T : class
+        internal static T ResolveService<T>(this ServiceRepository serviceProvider, bool ignoreExternalProvider = true) where T : class
         {
-            return (serviceProvider ?? LogManager.LogFactory.ServiceRepository)?.GetService(typeof(T)) as T;
+            if (ignoreExternalProvider)
+            {
+                return serviceProvider.GetService<T>();
+            }
+            else
+            {
+                IServiceProvider externalServiceProvider;
+
+                try
+                {
+                    if (serviceProvider.TryGetService<T>(out var service))
+                    {
+                        return service;
+                    }
+                    
+                    externalServiceProvider = serviceProvider.GetService<IServiceProvider>();
+                }
+                catch (NLogDependencyResolveException)
+                {
+                    externalServiceProvider = serviceProvider.GetService<IServiceProvider>();
+                    if (ReferenceEquals(externalServiceProvider, serviceProvider))
+                    {
+                        throw;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (ex.MustBeRethrown())
+                        throw;
+
+                    throw new NLogDependencyResolveException(ex.Message, ex, typeof(T));
+                }
+
+                if (ReferenceEquals(externalServiceProvider, serviceProvider))
+                {
+                    throw new NLogDependencyResolveException("Instance of class must be registered", typeof(T));
+                }
+
+                // External IServiceProvider can be dangerous to use from Logging-library and can lead to deadlock or stackoverflow
+                // But during initialization of Logging-library then use of external IServiceProvider is probably safe
+                var externalService = externalServiceProvider.GetService<T>();
+                // Cache singleton so also available when logging-library has been fully initialized
+                serviceProvider.RegisterService(typeof(T), externalService);
+                return externalService;
+            }
+        }
+
+        internal static T GetService<T>(this IServiceProvider serviceProvider) where T : class
+        {
+            try
+            {
+                var service = (serviceProvider ?? LogManager.LogFactory.ServiceRepository).GetService(typeof(T)) as T;
+                if (service is null)
+                    throw new NLogDependencyResolveException("Instance of class is unavailable", typeof(T));
+
+                return service;
+            }
+            catch (NLogDependencyResolveException ex)
+            {
+                if (ex.ServiceType == typeof(T))
+                    throw;
+
+                throw new NLogDependencyResolveException(ex.Message, ex, typeof(T));
+            }
+            catch (Exception ex)
+            {
+                if (ex.MustBeRethrown())
+                    throw;
+
+                throw new NLogDependencyResolveException(ex.Message, ex, typeof(T));
+            }
         }
 
         /// <summary>
@@ -59,7 +129,7 @@ namespace NLog.Config
         /// <typeparam name="T">Type of interface</typeparam>
         /// <param name="serviceRepository">The repo</param>
         /// <param name="singleton">Singleton object to use for override</param>
-        public static ServiceRepository RegisterSingleton<T>(this ServiceRepository serviceRepository, T singleton) where T : class
+        internal static ServiceRepository RegisterSingleton<T>(this ServiceRepository serviceRepository, T singleton) where T : class
         {
             serviceRepository.RegisterService(typeof(T), singleton);
             return serviceRepository;
@@ -68,9 +138,9 @@ namespace NLog.Config
         /// <summary>
         /// Registers the string serializer to use with <see cref="LogEventInfo.MessageTemplateParameters"/>
         /// </summary>
-        public static ServiceRepository RegisterValueFormatter(this ServiceRepository serviceRepository, [NotNull] IValueFormatter valueFormatter)
+        internal static ServiceRepository RegisterValueFormatter(this ServiceRepository serviceRepository, [NotNull] IValueFormatter valueFormatter)
         {
-            if (valueFormatter == null)
+            if (valueFormatter is null)
             {
                 throw new ArgumentNullException(nameof(valueFormatter));
             }
@@ -79,9 +149,9 @@ namespace NLog.Config
             return serviceRepository;
         }
 
-        public static ServiceRepository RegisterJsonConverter(this ServiceRepository serviceRepository, [NotNull] IJsonConverter jsonConverter)
+        internal static ServiceRepository RegisterJsonConverter(this ServiceRepository serviceRepository, [NotNull] IJsonConverter jsonConverter)
         {
-            if (jsonConverter == null)
+            if (jsonConverter is null)
             {
                 throw new ArgumentNullException(nameof(jsonConverter));
             }
@@ -90,9 +160,9 @@ namespace NLog.Config
             return serviceRepository;
         }
 
-        public static ServiceRepository RegisterPropertyTypeConverter(this ServiceRepository serviceRepository, [NotNull] IPropertyTypeConverter converter)
+        internal static ServiceRepository RegisterPropertyTypeConverter(this ServiceRepository serviceRepository, [NotNull] IPropertyTypeConverter converter)
         {
-            if (converter == null)
+            if (converter is null)
             {
                 throw new ArgumentNullException(nameof(converter));
             }
@@ -101,9 +171,9 @@ namespace NLog.Config
             return serviceRepository;
         }
 
-        public static ServiceRepository RegisterObjectTypeTransformer(this ServiceRepository serviceRepository, [NotNull] IObjectTypeTransformer transformer)
+        internal static ServiceRepository RegisterObjectTypeTransformer(this ServiceRepository serviceRepository, [NotNull] IObjectTypeTransformer transformer)
         {
-            if (transformer == null)
+            if (transformer is null)
             {
                 throw new ArgumentNullException(nameof(transformer));
             }
@@ -112,8 +182,36 @@ namespace NLog.Config
             return serviceRepository;
         }
 
-        public static ServiceRepository RegisterDefaults(this ServiceRepository serviceRepository)
+        internal static ServiceRepository RegisterMessageTemplateParser(this ServiceRepository serviceRepository, bool? messageTemplateParser)
         {
+            if (messageTemplateParser == false)
+            {
+                NLog.Common.InternalLogger.Info("Message Template String Format always enabled");
+                serviceRepository.RegisterSingleton<ILogMessageFormatter>(LogMessageStringFormatter.Default);
+            }
+            else if (messageTemplateParser == true)
+            {
+                NLog.Common.InternalLogger.Info("Message Template Format always enabled");
+                serviceRepository.RegisterSingleton<ILogMessageFormatter>(new LogMessageTemplateFormatter(serviceRepository, true, false));
+            }
+            else
+            {
+                //null = auto
+                NLog.Common.InternalLogger.Info("Message Template Auto Format enabled");
+                serviceRepository.RegisterSingleton<ILogMessageFormatter>(new LogMessageTemplateFormatter(serviceRepository, false, false));
+            }
+            return serviceRepository;
+        }
+
+        internal static bool? ResolveMessageTemplateParser(this ServiceRepository serviceRepository)
+        {
+            var messageFormatter = serviceRepository.GetService<ILogMessageFormatter>();
+            return messageFormatter?.MessageTemplateParser;
+        }
+
+        internal static ServiceRepository RegisterDefaults(this ServiceRepository serviceRepository)
+        {
+            serviceRepository.RegisterSingleton<IServiceProvider>(serviceRepository);
             serviceRepository.RegisterSingleton<ILogMessageFormatter>(new LogMessageTemplateFormatter(serviceRepository, false, false));
             serviceRepository.RegisterJsonConverter(new DefaultJsonSerializer(serviceRepository));
             serviceRepository.RegisterValueFormatter(new MessageTemplates.ValueFormatter(serviceRepository));

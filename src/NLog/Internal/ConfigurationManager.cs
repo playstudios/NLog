@@ -1,5 +1,5 @@
-// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+﻿// 
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,12 +42,14 @@ namespace NLog.Internal
     /// Just a wrapper around the BCL ConfigurationManager, but used to enable
     /// unit testing.
     /// </summary>
-    public class ConfigurationManager : IConfigurationManager
+    internal class ConfigurationManager : IConfigurationManager
     {
-        /// <summary>
-        /// Gets the wrapper around ConfigurationManager.AppSettings.
-        /// </summary>
         public NameValueCollection AppSettings => System.Configuration.ConfigurationManager.AppSettings;
+
+        public System.Configuration.ConnectionStringSettings LookupConnectionString(string name)
+        {
+            return System.Configuration.ConfigurationManager.ConnectionStrings[name];
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -63,9 +63,6 @@ namespace NLog.Internal.FileAppenders
         /// </summary>
         /// <param name="fileName">File name associated with a single appender.</param>
         /// <returns>The allocated appender.</returns>
-        /// <exception cref="NullReferenceException">
-        /// Thrown when <see cref="M:AllocateAppender"/> is called on an <c>Empty</c><see cref="FileAppenderCache"/> instance.
-        /// </exception>
         BaseFileAppender AllocateAppender(string fileName);
 
         /// <summary>
@@ -76,8 +73,8 @@ namespace NLog.Internal.FileAppenders
         /// <summary>
         /// Close the allocated appenders initialized before the supplied time.
         /// </summary>
-        /// <param name="expireTime">The time which prior the appenders considered expired</param>
-        void CloseAppenders(DateTime expireTime);
+        /// <param name="expireTimeUtc">The time which prior the appenders considered expired</param>
+        void CloseExpiredAppenders(DateTime expireTimeUtc);
 
         /// <summary>
         /// Flush all the allocated appenders. 

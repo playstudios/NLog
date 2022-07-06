@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -39,13 +39,7 @@ namespace MyExtensionNamespace
     [Filter("whenFoo")]
     public class WhenFooFilter : Filter
     {
-        private int x;
-
-        public int X
-        {
-            get => x;
-            set => x = value;
-        }
+        public int X { get; set; }
 
         protected override FilterResult Check(LogEventInfo logEvent)
         {

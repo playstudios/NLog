@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,7 +33,8 @@
 
 namespace NLog.Layouts
 {
-    using System.ComponentModel;
+    using System;
+    using System.Text;
     using NLog.Config;
     using NLog.Internal;
 
@@ -43,6 +44,8 @@ namespace NLog.Layouts
     [NLogConfigurationItem]
     public class XmlAttribute
     {
+        private readonly ValueTypeLayoutInfo _layoutInfo = new ValueTypeLayoutInfo();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="XmlAttribute" /> class.
         /// </summary>
@@ -67,45 +70,95 @@ namespace NLog.Layouts
             Layout = layout;
             Encode = encode;
             IncludeEmptyValue = false;
-            LayoutWrapper.XmlEncodeNewlines = true;
         }
 
         /// <summary>
         /// Gets or sets the name of the attribute.
         /// </summary>
-        /// <docgen category='XML Attribute Options' order='10' />
+        /// <docgen category='Layout Options' order='1' />
         [RequiredParameter]
-        public string Name { get => _name; set => _name = XmlHelper.XmlConvertToElementName(value?.Trim(), true); }
+        public string Name { get => _name; set => _name = XmlHelper.XmlConvertToElementName(value?.Trim()); }
         private string _name;
 
         /// <summary>
         /// Gets or sets the layout that will be rendered as the attribute's value.
         /// </summary>
-        /// <docgen category='XML Attribute Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [RequiredParameter]
-        public Layout Layout
-        {
-            get => LayoutWrapper.Inner;
-            set => LayoutWrapper.Inner = value;
-        }
+        public Layout Layout { get => _layoutInfo.Layout; set => _layoutInfo.Layout = value; }
 
         /// <summary>
-        /// Determines whether or not this attribute will be Xml encoded.
+        /// Gets or sets the result value type, for conversion of layout rendering output
         /// </summary>
-        /// <docgen category='XML Attribute Options' order='100' />
-        [DefaultValue(true)]
-        public bool Encode
-        {
-            get => LayoutWrapper.XmlEncode;
-            set => LayoutWrapper.XmlEncode = value;
-        }
+        /// <docgen category='Layout Options' order='50' />
+        public Type ValueType { get => _layoutInfo.ValueType; set => _layoutInfo.ValueType = value; }
+
+        /// <summary>
+        /// Gets or sets the fallback value when result value is not available
+        /// </summary>
+        /// <docgen category='Layout Options' order='50' />
+        public Layout DefaultValue { get => _layoutInfo.DefaultValue; set => _layoutInfo.DefaultValue = value; }
+
+        /// <summary>
+        /// Gets or sets whether output should be encoded with Xml-string escaping, or be treated as valid xml-attribute-value
+        /// </summary>
+        /// <docgen category='Layout Options' order='50' />
+        public bool Encode { get; set; }
 
         /// <summary>
         /// Gets or sets whether an attribute with empty value should be included in the output
         /// </summary>
-        /// <docgen category='XML Attribute Options' order='100' />
-        public bool IncludeEmptyValue { get; set; }
+        /// <docgen category='Layout Options' order='50' />
+        public bool IncludeEmptyValue
+        {
+            get => _includeEmptyValue;
+            set
+            {
+                _includeEmptyValue = value;
+                _layoutInfo.ForceDefaultValueNull = !value;
+            }
+        }
+        private bool _includeEmptyValue;
 
-        internal readonly LayoutRenderers.Wrappers.XmlEncodeLayoutRendererWrapper LayoutWrapper = new LayoutRenderers.Wrappers.XmlEncodeLayoutRendererWrapper();
+        internal bool RenderAppendXmlValue(LogEventInfo logEvent, StringBuilder builder)
+        {
+            if (ValueType is null)
+            {
+                int orgLength = builder.Length;
+                Layout.Render(logEvent, builder);
+                if (!IncludeEmptyValue && builder.Length <= orgLength)
+                {
+                    return false;
+                }
+
+                if (Encode)
+                {
+                    XmlHelper.PerformXmlEscapeWhenNeeded(builder, orgLength, true);
+                }
+            }
+            else
+            {
+                var objectValue = _layoutInfo.RenderValue(logEvent);
+                if (!IncludeEmptyValue && (objectValue is null || string.Empty.Equals(objectValue)))
+                {
+                    return false;
+                }
+
+                var convertibleValue = objectValue as IConvertible;
+                var objTypeCode = convertibleValue?.GetTypeCode() ?? (objectValue is null ? TypeCode.Empty : TypeCode.Object);
+                if (objTypeCode != TypeCode.Object)
+                {
+                    string xmlValueString = XmlHelper.XmlConvertToString(convertibleValue, objTypeCode, true);
+                    builder.Append(xmlValueString);
+                }
+                else
+                {
+                    string xmlValueString = XmlHelper.XmlConvertToStringSafe(objectValue);
+                    builder.Append(xmlValueString);
+                }
+            }
+
+            return true;
+        }
     }
 }

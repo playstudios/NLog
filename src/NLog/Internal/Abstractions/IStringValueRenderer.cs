@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,6 +36,9 @@ namespace NLog.Internal
     /// <summary>
     /// Supports rendering as string value with limited or no allocations (preferred)
     /// </summary>
+    /// <remarks>
+    /// Implementors must not have the [AppDomainFixedOutput] attribute
+    /// </remarks>
     interface IStringValueRenderer
     {
         /// <summary>

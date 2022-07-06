@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,30 +31,43 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace NLog.Targets
 {
+    using System;
+    using System.ComponentModel;
+
     /// <summary>
     /// The action to be taken when there are more connections then the max.
     /// </summary>
     public enum NetworkTargetConnectionsOverflowAction
     {
         /// <summary>
+        /// Allow new connections when reaching max connection limit
+        /// </summary>
+        Grow = 0,
+
+        /// <summary>
         /// Just allow it.
         /// </summary>
-        AllowNewConnnection, //TODO Nlog 5 - fix typo and obsolete this one
+        [Obsolete("Replaced by Grow. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        AllowNewConnnection = 0,
+
+        /// <summary>
+        /// Discard new messages when reaching max connection limit
+        /// </summary>
+        Discard = 1,
 
         /// <summary>
         /// Discard the connection item.
         /// </summary>
-        DiscardMessage,
+        [Obsolete("Replaced by Discard. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        DiscardMessage = 1,
 
         /// <summary>
         /// Block until there's more room in the queue.
         /// </summary>
-        Block,
+        Block = 2,
     }
 }

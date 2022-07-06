@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -38,6 +38,7 @@ namespace NLog.Common
     /// <summary>
     /// A cyclic buffer of <see cref="LogEventInfo"/> object.
     /// </summary>
+    [Obsolete("Use AsyncRequestQueue instead. Marked obsolete on NLog 5.0")]
     public class LogEventInfoBuffer
     {
         private readonly object _lockObject = new object();

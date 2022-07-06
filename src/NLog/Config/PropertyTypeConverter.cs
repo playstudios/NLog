@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,6 +34,8 @@
 namespace NLog.Config
 {
     using System;
+    using System.Collections.Generic;
+    using System.Reflection;
     using NLog.Internal;
 
     /// <summary>
@@ -46,84 +48,159 @@ namespace NLog.Config
         /// </summary>
         public static PropertyTypeConverter Instance { get; } = new PropertyTypeConverter();
 
+        private static Dictionary<Type, Func<string, string, IFormatProvider, object>> StringConverterLookup => _stringConverters ?? (_stringConverters = BuildStringConverterLookup());
+        private static Dictionary<Type, Func<string, string, IFormatProvider, object>> _stringConverters;
+
+        private static Dictionary<Type, Func<string, string, IFormatProvider, object>> BuildStringConverterLookup()
+        {
+            return new Dictionary<Type, Func<string, string, IFormatProvider, object>>()
+            {
+                { typeof(System.Text.Encoding), (stringvalue, format, formatProvider) => ConvertToEncoding(stringvalue) },
+                { typeof(System.Globalization.CultureInfo), (stringvalue, format, formatProvider) => new System.Globalization.CultureInfo(stringvalue) },
+                { typeof(Type), (stringvalue, format, formatProvider) => Type.GetType(stringvalue, true) },
+                { typeof(NLog.Targets.LineEndingMode), (stringvalue, format, formatProvider) => NLog.Targets.LineEndingMode.FromString(stringvalue) },
+                { typeof(LogLevel), (stringvalue, format, formatProvider) => LogLevel.FromString(stringvalue) },
+                { typeof(Uri), (stringvalue, format, formatProvider) => new Uri(stringvalue) },
+                { typeof(DateTime), (stringvalue, format, formatProvider) => ConvertToDateTime(format, formatProvider, stringvalue) },
+                { typeof(DateTimeOffset), (stringvalue, format, formatProvider) => ConvertToDateTimeOffset(format, formatProvider, stringvalue) },
+                { typeof(TimeSpan), (stringvalue, format, formatProvider) => ConvertToTimeSpan(format, formatProvider, stringvalue) },
+                { typeof(Guid), (stringvalue, format, formatProvider) => ConvertGuid(format, stringvalue) },
+            };
+        }
+
+        internal static bool IsComplexType(Type type)
+        {
+            return !type.IsValueType() && !typeof(IConvertible).IsAssignableFrom(type) && !StringConverterLookup.ContainsKey(type) && type.GetFirstCustomAttribute<System.ComponentModel.TypeConverterAttribute>() is null;
+        }
+
         /// <inheritdoc/>
         public object Convert(object propertyValue, Type propertyType, string format, IFormatProvider formatProvider)
         {
-            if (!NeedToConvert(propertyValue, propertyType))
+            if (propertyValue is null || propertyType is null || propertyType == typeof(object))
+            {
+                return propertyValue;   // No type conversion required
+            }
+
+            var propertyValueType = propertyValue.GetType();
+            if (propertyType.Equals(propertyValueType))
+            {
+                return propertyValue;   // Same type
+            }
+
+            var nullableType = Nullable.GetUnderlyingType(propertyType);
+            if (nullableType != null)
+            {
+                if (nullableType.Equals(propertyValueType))
+                {
+                    return propertyValue;   // Same type
+                }
+
+                if (propertyValue is string propertyString && StringHelpers.IsNullOrWhiteSpace(propertyString))
+                {
+                    return null;
+                }
+
+                propertyType = nullableType;
+            }
+
+            return ChangeObjectType(propertyValue, propertyType, format, formatProvider);
+        }
+
+        private static bool TryConvertFromString(string propertyString, Type propertyType, string format, IFormatProvider formatProvider, out object propertyValue)
+        {
+            propertyValue = propertyString = propertyString.Trim();
+
+            if (StringConverterLookup.TryGetValue(propertyType, out var converter))
+            {
+                propertyValue = converter.Invoke(propertyString, format, formatProvider);
+                return true;
+            }
+
+            if (propertyType.IsEnum() && NLog.Common.ConversionHelpers.TryParseEnum(propertyString, propertyType, out var enumValue))
+            {
+                propertyValue = enumValue;
+                return true;
+            }
+
+            if (!typeof(IConvertible).IsAssignableFrom(propertyType) && PropertyHelper.TryTypeConverterConversion(propertyType, propertyString, out var convertedValue))
+            {
+                propertyValue = convertedValue;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static object ChangeObjectType(object propertyValue, Type propertyType, string format, IFormatProvider formatProvider)
+        {
+            if (propertyValue is string propertyString && TryConvertFromString(propertyString, propertyType, format, formatProvider, out propertyValue))
             {
                 return propertyValue;
             }
 
-            var nullableType = Nullable.GetUnderlyingType(propertyType);
-            var type = nullableType ?? propertyType;
-            if (propertyValue is string propertyString)
+            if (propertyValue is IConvertible convertibleValue)
             {
-                propertyValue = propertyString = propertyString.Trim();
-
-                if (nullableType != null && StringHelpers.IsNullOrWhiteSpace(propertyString))
-                {
+                var typeCode = convertibleValue.GetTypeCode();
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
+                if (typeCode == TypeCode.DBNull)
+                    return convertibleValue;
+#endif
+                if (typeCode == TypeCode.Empty)
                     return null;
-                }
-                
-                if (type == typeof(DateTime))
+            }
+            else
+            {
+                var logConverter = System.ComponentModel.TypeDescriptor.GetConverter(propertyValue.GetType());
+                if (logConverter != null && logConverter.CanConvertTo(propertyType))
                 {
-                    return ConvertDateTime(format, formatProvider, propertyString);
-                }
-                if (type == typeof(DateTimeOffset))
-                {
-                    return ConvertDateTimeOffset(format, formatProvider, propertyString);
-                }
-                if (type == typeof(TimeSpan))
-                {
-                    return ConvertTimeSpan(format, formatProvider, propertyString);
-                }
-                if (type == typeof(Guid))
-                {
-                    return ConvertGuid(format, propertyString);
+                    return logConverter.ConvertTo(propertyValue, propertyType);
                 }
             }
-            else if (!string.IsNullOrEmpty(format) && propertyValue is IFormattable formattableValue)
+
+            if (!string.IsNullOrEmpty(format) && propertyValue is IFormattable formattableValue)
             {
                 propertyValue = formattableValue.ToString(format, formatProvider);
             }
 
-            var newValue = System.Convert.ChangeType(propertyValue, type, formatProvider);
-            return newValue;
-        }
-
-        private static bool NeedToConvert(object propertyValue, Type propertyType)
-        {
-            return propertyType != null && propertyValue != null && propertyValue.GetType() != propertyType && propertyType != typeof(object);
+            return System.Convert.ChangeType(propertyValue, propertyType, formatProvider);
         }
 
         private static object ConvertGuid(string format, string propertyString)
         {
-#if NET3_5
-            return new Guid(propertyString);
-#else
+#if !NET35
             return string.IsNullOrEmpty(format) ? Guid.Parse(propertyString) : Guid.ParseExact(propertyString, format);
+#else
+            return new Guid(propertyString);       
 #endif
         }
 
-        private static object ConvertTimeSpan(string format, IFormatProvider formatProvider, string propertyString)
+        private static object ConvertToEncoding(string stringValue)
         {
-#if NET3_5
-            return TimeSpan.Parse(propertyString);
-#else
+            stringValue = stringValue.Trim();
+            if (string.Equals(stringValue, nameof(System.Text.Encoding.UTF8), StringComparison.OrdinalIgnoreCase))
+                stringValue = System.Text.Encoding.UTF8.WebName;  // Support utf8 without hyphen (And not just Utf-8)
+            return System.Text.Encoding.GetEncoding(stringValue);
+        }
+
+        private static object ConvertToTimeSpan(string format, IFormatProvider formatProvider, string propertyString)
+        {
+#if !NET35
             if (!string.IsNullOrEmpty(format))
                 return TimeSpan.ParseExact(propertyString, format, formatProvider);
             return TimeSpan.Parse(propertyString, formatProvider);
+#else
+            return TimeSpan.Parse(propertyString);
 #endif
         }
 
-        private static object ConvertDateTimeOffset(string format, IFormatProvider formatProvider, string propertyString)
+        private static object ConvertToDateTimeOffset(string format, IFormatProvider formatProvider, string propertyString)
         {
             if (!string.IsNullOrEmpty(format))
                 return DateTimeOffset.ParseExact(propertyString, format, formatProvider);
             return DateTimeOffset.Parse(propertyString, formatProvider);
         }
 
-        private static object ConvertDateTime(string format, IFormatProvider formatProvider, string propertyString)
+        private static object ConvertToDateTime(string format, IFormatProvider formatProvider, string propertyString)
         {
             if (!string.IsNullOrEmpty(format))
                 return DateTime.ParseExact(propertyString, format, formatProvider);

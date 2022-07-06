@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -57,10 +57,10 @@ namespace NLog.LayoutRenderers
         /// </summary>
         public FileContentsLayoutRenderer()
         {
-#if NETSTANDARD1_0
-            this.Encoding = Encoding.UTF8;
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             Encoding = Encoding.Default;
+#else
+            Encoding = Encoding.UTF8;
 #endif
             _lastFileName = string.Empty;
         }
@@ -79,11 +79,7 @@ namespace NLog.LayoutRenderers
         /// <docgen category='File Options' order='10' />
         public Encoding Encoding { get; set; }
 
-        /// <summary>
-        /// Renders the contents of the specified file and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             lock (_lockObject)
@@ -104,13 +100,13 @@ namespace NLog.LayoutRenderers
         {
             try
             {
-#if NETSTANDARD1_0
-                return File.ReadAllText(fileName, Encoding);
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
                 using (var reader = new StreamReader(fileName, Encoding))
                 {
                     return reader.ReadToEnd();
                 }
+#else
+                return File.ReadAllText(fileName, Encoding);
 #endif
             }
             catch (Exception exception)

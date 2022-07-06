@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -39,10 +39,8 @@ namespace NLog.Config
     /// Marks the class or a member as advanced. Advanced classes and members are hidden by 
     /// default in generated documentation.
     /// </summary>
+    [Obsolete("Attribute is no longer used. Obsolete with NLog 5.0")]
     [AttributeUsage(AttributeTargets.Property)]
-#if NET4_0 || NET4_5 && !NETSTANDARD1_0
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-#endif
     public sealed class AdvancedAttribute : Attribute
     {
         /// <summary>

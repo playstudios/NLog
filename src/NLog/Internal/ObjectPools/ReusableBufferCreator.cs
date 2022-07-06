@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,8 +31,6 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-
 namespace NLog.Internal
 {
     /// <summary>
@@ -41,7 +39,7 @@ namespace NLog.Internal
     internal class ReusableBufferCreator : ReusableObjectCreator<char[]>
     {
         public ReusableBufferCreator(int capacity)
-            :base(new char[capacity], (b) => { })
+            :base(capacity, cap => new char[cap], (b) => { })
         {
         }
     }

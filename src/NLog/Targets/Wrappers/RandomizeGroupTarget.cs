@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,24 +35,25 @@ namespace NLog.Targets.Wrappers
 {
     using System;
     using NLog.Common;
-    using NLog.Internal;
 
     /// <summary>
     /// Sends log messages to a randomly selected target.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/RandomizeGroup-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/RandomizeGroup-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>This example causes the messages to be written to either file1.txt or file2.txt 
     /// chosen randomly on a per-message basis.
     /// </p>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/RandomizeGroup/NLog.config" />
     /// <p>
-    /// The above examples assume just one target and a single rule. See below for
-    /// a programmatic configuration that's equivalent to the above config file:
+    /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/RandomizeGroup/Simple/Example.cs" />
     /// </example>
@@ -60,7 +61,7 @@ namespace NLog.Targets.Wrappers
     public class RandomizeGroupTarget : CompoundTargetBase
     {
 #pragma warning disable S2245   // Make sure that using this pseudorandom number generator is safe here (Not security sensitive)
-        private readonly Random _random = new Random();
+        private readonly Random _random = new Random(); //NOSONAR
 #pragma warning restore S2245   // Make sure that using this pseudorandom number generator is safe here
 
         /// <summary>
@@ -89,7 +90,6 @@ namespace NLog.Targets.Wrappers
         public RandomizeGroupTarget(params Target[] targets)
             : base(targets)
         {
-            OptimizeBufferReuse = GetType() == typeof(RandomizeGroupTarget);    // Class not sealed, reduce breaking changes
         }
 
         /// <summary>

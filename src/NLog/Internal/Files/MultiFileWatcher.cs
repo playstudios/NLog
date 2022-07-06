@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -73,7 +73,6 @@ namespace NLog.Internal
         {
             FileChanged = null;   // Release event listeners
             StopWatching();
-            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -83,9 +82,9 @@ namespace NLog.Internal
         {
             lock (_watcherMap)
             {
-                foreach (FileSystemWatcher watcher in _watcherMap.Values)
+                foreach (var watcher in _watcherMap)
                 {
-                    StopWatching(watcher);
+                    StopWatching(watcher.Value);
                 }
                 _watcherMap.Clear();
             }
@@ -99,8 +98,7 @@ namespace NLog.Internal
         {
             lock (_watcherMap)
             {
-                FileSystemWatcher watcher;
-                if (_watcherMap.TryGetValue(fileName, out watcher))
+                if (_watcherMap.TryGetValue(fileName, out var watcher))
                 {
                     StopWatching(watcher);
                     _watcherMap.Remove(fileName);
@@ -114,7 +112,7 @@ namespace NLog.Internal
         /// <param name="fileNames">The file names.</param>
         public void Watch(IEnumerable<string> fileNames)
         {
-            if (fileNames == null)
+            if (fileNames is null)
             {
                 return;
             }
@@ -125,22 +123,36 @@ namespace NLog.Internal
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "Watcher is released in Dispose()")]
-        internal void Watch(string fileName)
+        public void Watch(string fileName)
         {
-            var directory = Path.GetDirectoryName(fileName);
-            if (!Directory.Exists(directory))
+            try
             {
-                InternalLogger.Warn("Cannot watch file {0} for changes as directory {1} doesn't exist", fileName, directory);
-                return;
+                var directory = Path.GetDirectoryName(fileName);
+                directory = Path.GetFullPath(directory);
+                if (!Directory.Exists(directory))
+                {
+                    InternalLogger.Warn("Cannot watch file {0} for non-existing directory: {1}", fileName, directory);
+                    return;
+                }
+
+                var fileFilter = Path.GetFileName(fileName);
+                if (TryAddWatch(fileName, directory, fileFilter))
+                {
+                    InternalLogger.Debug("Watching file-filter '{0}' in directory: {1}", fileFilter, directory);
+                }
             }
+            catch (System.Security.SecurityException ex)
+            {
+                InternalLogger.Debug(ex, "Cannot watch for file changes: {0}", fileName);
+            }
+        }
 
-            var fileFilter = Path.GetFileName(fileName);
-
+        private bool TryAddWatch(string fileName, string directory, string fileFilter)
+        {
             lock (_watcherMap)
             {
                 if (_watcherMap.ContainsKey(fileName))
-                    return;
+                    return false;
 
                 FileSystemWatcher watcher = null;
 
@@ -160,13 +172,12 @@ namespace NLog.Internal
                     watcher.Error += OnWatcherError;
                     watcher.EnableRaisingEvents = true;
 
-                    InternalLogger.Debug("Watching path '{0}' filter '{1}' for changes.", watcher.Path, watcher.Filter);
-
                     _watcherMap.Add(fileName, watcher);
+                    return true;
                 }
                 catch (Exception ex)
                 {
-                    InternalLogger.Error(ex, "Failed Watching path '{0}' with file '{1}' for changes.", directory, fileName);
+                    InternalLogger.Error(ex, "Failed to setup FileSystemWatcher for file `{0}` with directory: {1}", fileName, directory);
                     if (ex.MustBeRethrown())
                         throw;
 
@@ -174,6 +185,8 @@ namespace NLog.Internal
                     {
                         StopWatching(watcher);
                     }
+
+                    return false;
                 }
             }
         }
@@ -224,9 +237,11 @@ namespace NLog.Internal
                 }
                 catch (Exception ex)
                 {
-                    InternalLogger.Error(ex, "Error Handling File Changed");
+#if DEBUG
                     if (ex.MustBeRethrownImmediately())
-                        throw;
+                        throw;  // Throwing exceptions here might crash the entire application (.NET 2.0 behavior)
+#endif
+                    InternalLogger.Error(ex, "Error Handling File Changed");
                 }
             }
         }

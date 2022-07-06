@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -45,7 +45,7 @@ namespace NLog.Time
         /// <summary>
         /// Initializes a new instance of the <see cref="TimeSourceAttribute" /> class.
         /// </summary>
-        /// <param name="name">Name of the time source.</param>
+        /// <param name="name">The Time type-alias for use in NLog configuration.</param>
         public TimeSourceAttribute(string name)
             : base(name)
         {

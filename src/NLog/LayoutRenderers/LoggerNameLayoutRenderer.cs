@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,7 +33,6 @@
 
 namespace NLog.LayoutRenderers
 {
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
@@ -42,17 +41,14 @@ namespace NLog.LayoutRenderers
     /// The logger name.
     /// </summary>
     [LayoutRenderer("logger")]
-    [LayoutRenderer("logger-name")]
     [LayoutRenderer("loggername")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class LoggerNameLayoutRenderer : LayoutRenderer, IStringValueRenderer
     {
         /// <summary>
         /// Gets or sets a value indicating whether to render short logger name (the part after the trailing dot character).
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='10' />
         public bool ShortName { get; set; }
 
         /// <inheritdoc/>
@@ -70,7 +66,6 @@ namespace NLog.LayoutRenderers
             builder.Append(logEvent.LoggerName);
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent)
         {
             if (ShortName)

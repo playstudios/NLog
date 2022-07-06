@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -47,15 +47,31 @@ namespace NLog.Targets.Wrappers
         /// </summary>
         /// <docgen category='General Options' order='11' />
         [RequiredParameter]
-        public Target WrappedTarget { get; set; }
+        public Target WrappedTarget
+        {
+            get => _wrappedTarget;
+            set
+            {
+                _wrappedTarget = value;
+                _tostring = null;
+            }
+        }
+        private Target _wrappedTarget;
 
-        /// <summary>
-        /// Returns the text representation of the object. Used for diagnostics.
-        /// </summary>
-        /// <returns>A string that describes the target.</returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
-            return $"{base.ToString()}({WrappedTarget})";
+            return _tostring ?? (_tostring = GenerateTargetToString());
+        }
+
+        private string GenerateTargetToString()
+        {
+            if (WrappedTarget is null)
+                return GenerateTargetToString(true);
+            else if (string.IsNullOrEmpty(Name))
+                return $"{GenerateTargetToString(true, "")}_{WrappedTarget}";
+            else
+                return $"{GenerateTargetToString(true, "")}_{WrappedTarget.GenerateTargetToString(false, Name)}";
         }
 
         /// <summary>
@@ -64,7 +80,10 @@ namespace NLog.Targets.Wrappers
         /// <param name="asyncContinuation">The asynchronous continuation.</param>
         protected override void FlushAsync(AsyncContinuation asyncContinuation)
         {
-            WrappedTarget.Flush(asyncContinuation);
+            if (WrappedTarget is null)
+                asyncContinuation(null);
+            else
+                WrappedTarget.Flush(asyncContinuation);
         }
 
         /// <summary>

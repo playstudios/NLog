@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,10 +31,10 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+#if NET35 || NET40 || NET45
 
 namespace NLog.Internal
 {
-#if !NET4_6 && !NETSTANDARD
     using System;
     using System.Runtime.Serialization;
     using NLog.Common;
@@ -69,9 +69,7 @@ namespace NLog.Internal
             }
         }
 
-#if NET4_5
         [System.Security.Permissions.SecurityPermissionAttribute(System.Security.Permissions.SecurityAction.LinkDemand, SerializationFormatter = true)]
-#endif
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             try
@@ -107,5 +105,6 @@ namespace NLog.Internal
             return _wrapped ?? string.Empty;
         }
     }
-#endif
 }
+
+#endif

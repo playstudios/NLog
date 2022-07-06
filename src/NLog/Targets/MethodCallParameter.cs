@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,6 +44,8 @@ namespace NLog.Targets
     [NLogConfigurationItem]
     public class MethodCallParameter
     {
+        private readonly ValueTypeLayoutInfo _layoutInfo = new ValueTypeLayoutInfo();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MethodCallParameter" /> class.
         /// </summary>
@@ -90,33 +92,41 @@ namespace NLog.Targets
         /// <summary>
         /// Gets or sets the name of the parameter.
         /// </summary>
-        /// <docgen category='Parameter Options' order='10' />
+        /// <docgen category='Parameter Options' order='1' />
         public string Name { get; set; }
-
-        /// <summary>
-        /// Gets or sets the type of the parameter. Obsolete alias for <see cref="ParameterType"/>
-        /// </summary>
-        /// <docgen category='Parameter Options' order='10' />
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1721:PropertyNamesShouldNotMatchGetMethods", Justification = "Backwards compatibility")]
-        [Obsolete("Use property ParameterType instead. Marked obsolete on NLog 4.6")]
-        public Type Type
-        {
-            get => ParameterType;
-            set => ParameterType = value;
-        }
-
-        /// <summary>
-        /// Gets or sets the type of the parameter. 
-        /// </summary>
-        /// <docgen category='Parameter Options' order='10' />
-        [DefaultValue(typeof(string))]
-        public Type ParameterType { get; set; }
 
         /// <summary>
         /// Gets or sets the layout that should be use to calculate the value for the parameter.
         /// </summary>
         /// <docgen category='Parameter Options' order='10' />
         [RequiredParameter]
-        public Layout Layout { get; set; }
+        public Layout Layout { get => _layoutInfo.Layout; set => _layoutInfo.Layout = value; }
+
+        /// <summary>
+        /// Gets or sets the type of the parameter. Obsolete alias for <see cref="ParameterType"/>
+        /// </summary>
+        /// <docgen category='Parameter Options' order='50' />
+        [Obsolete("Use property ParameterType instead. Marked obsolete on NLog 4.6")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public Type Type { get => ParameterType; set => ParameterType = value; }
+
+        /// <summary>
+        /// Gets or sets the type of the parameter. 
+        /// </summary>
+        /// <docgen category='Parameter Options' order='50' />
+        public Type ParameterType { get => _layoutInfo.ValueType ?? typeof(string); set => _layoutInfo.ValueType = value; }
+
+        /// <summary>
+        /// Gets or sets the fallback value when result value is not available
+        /// </summary>
+        /// <docgen category='Parameter Options' order='50' />
+        public Layout DefaultValue { get => _layoutInfo.DefaultValue; set => _layoutInfo.DefaultValue = value; }
+
+        /// <summary>
+        /// Render Result Value
+        /// </summary>
+        /// <param name="logEvent">Log event for rendering</param>
+        /// <returns>Result value when available, else fallback to defaultValue</returns>
+        public object RenderValue(LogEventInfo logEvent) => _layoutInfo.RenderValue(logEvent);
     }
 }

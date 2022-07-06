@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers.Wrappers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
 
@@ -45,29 +44,19 @@ namespace NLog.LayoutRenderers.Wrappers
     [AmbientProperty("FSNormalize")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class FileSystemNormalizeLayoutRendererWrapper : WrapperLayoutRendererBase
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="FileSystemNormalizeLayoutRendererWrapper" /> class.
-        /// </summary>
-        public FileSystemNormalizeLayoutRendererWrapper()
-        {
-            FSNormalize = true;
-        }
-
         /// <summary>
         /// Gets or sets a value indicating whether to modify the output of this renderer so it can be used as a part of file path
         /// (illegal characters are replaced with '_').
         /// </summary>
-        /// <docgen category='Advanced Options' order='10' />
-        [DefaultValue(true)]
-        public bool FSNormalize { get; set; }
+        /// <docgen category='Advanced Options' order='50' />
+        public bool FSNormalize { get; set; } = true;
 
         /// <inheritdoc/>
         protected override void RenderInnerAndTransform(LogEventInfo logEvent, StringBuilder builder, int orgLength)
         {
-            Inner.RenderAppendBuilder(logEvent, builder);
+            Inner.Render(logEvent, builder);
             if (FSNormalize && builder.Length > orgLength)
             {
                 TransformFileSystemNormalize(builder, orgLength);

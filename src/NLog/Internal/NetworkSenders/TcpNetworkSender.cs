@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,8 +44,9 @@ namespace NLog.Internal.NetworkSenders
     internal class TcpNetworkSender : QueuedNetworkSender
     {
         private static bool? EnableKeepAliveSuccessful;
-        private readonly EventHandler<SocketAsyncEventArgs> _socketOperationCompleted;
         private ISocket _socket;
+        private readonly EventHandler<SocketAsyncEventArgs> _socketOperationCompletedAsync;
+        private AsyncHelpersTask? _asyncBeginRequest;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TcpNetworkSender"/> class.
@@ -56,7 +57,7 @@ namespace NLog.Internal.NetworkSenders
             : base(url)
         {
             AddressFamily = addressFamily;
-            _socketOperationCompleted = SocketOperationCompleted;
+            _socketOperationCompletedAsync = SocketOperationCompletedAsync;
         }
 
         internal AddressFamily AddressFamily { get; set; }
@@ -73,7 +74,6 @@ namespace NLog.Internal.NetworkSenders
         /// <param name="socketType">Type of the socket.</param>
         /// <param name="protocolType">Type of the protocol.</param>
         /// <returns>Instance of <see cref="ISocket" /> which represents the socket.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "This is a factory method")]
         protected internal virtual ISocket CreateSocket(string host, AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
         {
             var socketProxy = new SocketProxy(addressFamily, socketType, protocolType);
@@ -83,7 +83,7 @@ namespace NLog.Internal.NetworkSenders
                 EnableKeepAliveSuccessful = TryEnableKeepAlive(socketProxy.UnderlyingSocket, (int)KeepAliveTime.TotalSeconds);
             }
 
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             if (SslProtocols != System.Security.Authentication.SslProtocols.None)
             {
                 return new SslSocketProxy(host, SslProtocols, socketProxy);
@@ -159,16 +159,13 @@ namespace NLog.Internal.NetworkSenders
             }
         }
 
-        /// <summary>
-        /// Performs sender-specific initialization.
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "Object is disposed in the event handler.")]
         protected override void DoInitialize()
         {
             var uri = new Uri(Address);
             var args = new MySocketAsyncEventArgs();
-            args.RemoteEndPoint = ParseEndpointAddress(new Uri(Address), AddressFamily);
-            args.Completed += _socketOperationCompleted;
+            var ipAddress = ResolveIpAddress(uri, AddressFamily);
+            args.RemoteEndPoint = new System.Net.IPEndPoint(ipAddress, uri.Port);
+            args.Completed += _socketOperationCompletedAsync;
             args.UserToken = null;
 
             _socket = CreateSocket(uri.Host, args.RemoteEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -193,14 +190,10 @@ namespace NLog.Internal.NetworkSenders
 
             if (!asyncOperation)
             {
-                SocketOperationCompleted(_socket, args);
+                SocketOperationCompletedAsync(_socket, args);
             }
         }
 
-        /// <summary>
-        /// Closes the socket.
-        /// </summary>
-        /// <param name="continuation">The continuation.</param>
         protected override void DoClose(AsyncContinuation continuation)
         {
             base.DoClose(ex => CloseSocket(continuation, ex));
@@ -212,11 +205,7 @@ namespace NLog.Internal.NetworkSenders
             {
                 var sock = _socket;
                 _socket = null;
-
-                if (sock != null)
-                {
-                    sock.Close();
-                }
+                sock?.Close();
 
                 continuation(pendingException);
             }
@@ -231,60 +220,97 @@ namespace NLog.Internal.NetworkSenders
             }
         }
 
-        private void SocketOperationCompleted(object sender, SocketAsyncEventArgs args)
-        {
-            var asyncContinuation = args.UserToken as AsyncContinuation;
-
-            Exception pendingException = null;
-            if (args.SocketError != SocketError.Success)
-            {
-                pendingException = new IOException("Error: " + args.SocketError);
-            }
-
-            args.Completed -= _socketOperationCompleted;    // Maybe consider reusing for next request?
-            args.Dispose();
-
-            base.EndRequest(asyncContinuation, pendingException);
-        }
-
         protected override void BeginRequest(NetworkRequestArgs eventArgs)
         {
-            var args = new MySocketAsyncEventArgs();
-            args.SetBuffer(eventArgs.RequestBuffer, eventArgs.RequestBufferOffset, eventArgs.RequestBufferLength);
-            args.UserToken = eventArgs.AsyncContinuation;
-            args.Completed += _socketOperationCompleted;
+            var socketEventArgs = new MySocketAsyncEventArgs();
+            socketEventArgs.Completed += _socketOperationCompletedAsync;
+            SetSocketNetworkRequest(socketEventArgs, eventArgs);
 
+            // Schedule async network operation to avoid blocking socket-operation (Allow adding more request)
+            if (_asyncBeginRequest is null)
+                _asyncBeginRequest = new AsyncHelpersTask(BeginRequestAsync);
+            AsyncHelpers.StartAsyncTask(_asyncBeginRequest.Value, socketEventArgs);
+        }
+
+        private void BeginRequestAsync(object state)
+        {
+            BeginSocketRequest((SocketAsyncEventArgs)state);
+        }
+
+        private void BeginSocketRequest(SocketAsyncEventArgs args)
+        {
             bool asyncOperation = false;
-            try
-            {
-                asyncOperation = _socket.SendAsync(args);
-            }
-            catch (SocketException ex)
-            {
-                InternalLogger.Error(ex, "NetworkTarget: Error sending tcp request");
-                args.SocketError = ex.SocketErrorCode;
-            }
-            catch (Exception ex)
-            {
-                InternalLogger.Error(ex, "NetworkTarget: Error sending tcp request");
-                if (ex.InnerException is SocketException socketException)
-                    args.SocketError = socketException.SocketErrorCode;
-                else
-                    args.SocketError = SocketError.OperationAborted;
-            }
 
-            if (!asyncOperation)
+            do
             {
-                SocketOperationCompleted(_socket, args);
+                try
+                {
+                    asyncOperation = _socket.SendAsync(args);
+                }
+                catch (SocketException ex)
+                {
+                    InternalLogger.Error(ex, "NetworkTarget: Error sending tcp request");
+                    args.SocketError = ex.SocketErrorCode;
+                }
+                catch (Exception ex)
+                {
+                    InternalLogger.Error(ex, "NetworkTarget: Error sending tcp request");
+                    if (ex.InnerException is SocketException socketException)
+                        args.SocketError = socketException.SocketErrorCode;
+                    else
+                        args.SocketError = SocketError.OperationAborted;
+                }
+
+                args = asyncOperation ? null : SocketOperationCompleted(args);
+            }
+            while (args != null);
+        }
+
+        private void SetSocketNetworkRequest(SocketAsyncEventArgs socketEventArgs, NetworkRequestArgs networkRequest)
+        {
+            socketEventArgs.SetBuffer(networkRequest.RequestBuffer, networkRequest.RequestBufferOffset, networkRequest.RequestBufferLength);
+            socketEventArgs.UserToken = networkRequest.AsyncContinuation;
+        }
+
+        private void SocketOperationCompletedAsync(object sender, SocketAsyncEventArgs args)
+        {
+            var nextRequest = SocketOperationCompleted(args);
+            if (nextRequest != null)
+            {
+                BeginSocketRequest(nextRequest);
             }
         }
 
-        public override void CheckSocket()
+        private SocketAsyncEventArgs SocketOperationCompleted(SocketAsyncEventArgs args)
         {
-            if (_socket == null)
+            Exception socketException = null;
+            if (args.SocketError != SocketError.Success)
+            {
+                socketException = new IOException($"Error: {args.SocketError.ToString()}, Address: {Address}");
+            }
+
+            var asyncContinuation = args.UserToken as AsyncContinuation;
+            var nextRequest = EndRequest(asyncContinuation, socketException);
+            if (nextRequest.HasValue)
+            {
+                SetSocketNetworkRequest(args, nextRequest.Value);
+                return args;
+            }
+            else
+            {
+                args.Completed -= _socketOperationCompletedAsync;
+                args.Dispose();
+                return null;
+            }
+        }
+
+        public override ISocket CheckSocket()
+        {
+            if (_socket is null)
             {
                 DoInitialize();
             }
+            return _socket;
         }
 
         /// <summary>

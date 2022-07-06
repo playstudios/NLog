@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.Internal
 {
     using System;
-    using NLog.Config;
 
     internal static class FormatHelper
     {
@@ -50,26 +49,23 @@ namespace NLog.Internal
         internal static string ConvertToString(object o, IFormatProvider formatProvider)
         {
             // if no IFormatProvider is specified, use the Configuration.DefaultCultureInfo value.
-            if (formatProvider == null)
+            if (formatProvider is null)
             {
                 if (SkipFormattableToString(o))
                     return o?.ToString() ?? string.Empty;
 
                 if (o is IFormattable)
                 {
-                    // Lookup / loading global configuration can be dangerous and can lead to deadlocks
-                    var loggingConfiguration = LogManager.Configuration;
-                    if (loggingConfiguration != null)
-                        formatProvider = loggingConfiguration.DefaultCultureInfo;
+                    formatProvider = LogManager.LogFactory.DefaultCultureInfo;
                 }
             }
 
             return Convert.ToString(o, formatProvider);
         }
 
-        private static bool SkipFormattableToString(object o)
+        private static bool SkipFormattableToString(object value)
         {
-            switch (Convert.GetTypeCode(o))
+            switch (Convert.GetTypeCode(value))
             {
                 case TypeCode.String:   return true;
                 case TypeCode.Empty:    return true;
@@ -92,7 +88,7 @@ namespace NLog.Internal
             }
             else
             {
-                return value.ToString() ?? string.Empty;
+                return value?.ToString() ?? string.Empty;
             }
         }
     }

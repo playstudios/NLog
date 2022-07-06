@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -43,6 +43,9 @@ namespace NLog.Targets.Wrappers
     /// <summary>
     /// Filters buffered log entries based on a set of conditions that are evaluated on a group of events.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/PostFilteringWrapper-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/PostFilteringWrapper-target">Documentation on NLog Wiki</seealso>
     /// <remarks>
     /// PostFilteringWrapper must be used with some type of buffering target or wrapper, such as
@@ -57,21 +60,18 @@ namespace NLog.Targets.Wrappers
     /// functionality.
     /// </p>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/PostFilteringWrapper/NLog.config" />
     /// <p>
-    /// The above examples assume just one target and a single rule. See below for
-    /// a programmatic configuration that's equivalent to the above config file:
+    /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/PostFilteringWrapper/Simple/Example.cs" />
     /// </example>
     [Target("PostFilteringWrapper", IsWrapper = true)]
     public class PostFilteringTargetWrapper : WrapperTargetBase
     {
-        private static object boxedTrue = true;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="PostFilteringTargetWrapper" /> class.
         /// </summary>
@@ -116,17 +116,6 @@ namespace NLog.Targets.Wrappers
         public IList<FilteringRule> Rules { get; private set; }
 
         /// <inheritdoc/>
-        protected override void InitializeTarget()
-        {
-            base.InitializeTarget();
-
-            if (!OptimizeBufferReuse && WrappedTarget != null && WrappedTarget.OptimizeBufferReuse)
-            {
-                OptimizeBufferReuse = GetType() == typeof(PostFilteringTargetWrapper); // Class not sealed, reduce breaking changes
-            }
-        }
-
-        /// <inheritdoc/>
         protected override void Write(AsyncLogEventInfo logEvent)
         {
             Write((IList<AsyncLogEventInfo>)new[] { logEvent });  // Single LogEvent should also work
@@ -141,30 +130,30 @@ namespace NLog.Targets.Wrappers
         /// <param name="logEvents">Array of log events to be post-filtered.</param>
         protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
-            InternalLogger.Trace("PostFilteringWrapper(Name={0}): Running on {1} events", Name, logEvents.Count);
+            InternalLogger.Trace("{0}: Running on {1} events", this, logEvents.Count);
 
             var resultFilter = EvaluateAllRules(logEvents) ?? DefaultFilter;
-            if (resultFilter == null)
+            if (resultFilter is null)
             {
                 WrappedTarget.WriteAsyncLogEvents(logEvents);
             }
             else
             {
-                InternalLogger.Trace("PostFilteringWrapper(Name={0}): Filter to apply: {1}", Name, resultFilter);
-                var resultBuffer = logEvents.Filter(resultFilter, ApplyFilter);
-                InternalLogger.Trace("PostFilteringWrapper(Name={0}): After filtering: {1} events.", Name, resultBuffer.Count);
+                InternalLogger.Trace("{0}: Filter to apply: {1}", this, resultFilter);
+                var resultBuffer = logEvents.Filter(resultFilter, (logEvent, filter) => ShouldLogEvent(logEvent, filter));
+                InternalLogger.Trace("{0}: After filtering: {1} events.", this, resultBuffer.Count);
                 if (resultBuffer.Count > 0)
                 {
-                    InternalLogger.Trace("PostFilteringWrapper(Name={0}): Sending to {1}", Name, WrappedTarget);
+                    InternalLogger.Trace("{0}: Sending to {1}", this, WrappedTarget);
                     WrappedTarget.WriteAsyncLogEvents(resultBuffer);
                 }
             }
         }
 
-        private static bool ApplyFilter(AsyncLogEventInfo logEvent, ConditionExpression resultFilter)
+        private static bool ShouldLogEvent(AsyncLogEventInfo logEvent, ConditionExpression resultFilter)
         {
             object v = resultFilter.Evaluate(logEvent.LogEvent);
-            if (boxedTrue.Equals(v))
+            if (ConditionExpression.BoxedTrue.Equals(v))
             {
                 return true;
             }
@@ -191,9 +180,9 @@ namespace NLog.Targets.Wrappers
                 {
                     var rule = Rules[j];
                     object v = rule.Exists.Evaluate(logEvents[i].LogEvent);
-                    if (boxedTrue.Equals(v))
+                    if (ConditionExpression.BoxedTrue.Equals(v))
                     {
-                        InternalLogger.Trace("PostFilteringWrapper(Name={0}): Rule matched: {1}", Name, rule.Exists);
+                        InternalLogger.Trace("{0}: Rule matched: {1}", this, rule.Exists);
                         return rule.Filter;
                     }
                 }

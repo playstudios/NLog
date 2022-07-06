@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,75 +33,57 @@
 
 namespace NLog.LayoutRenderers
 {
-    using System.ComponentModel;
     using System.Diagnostics;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
+    using NLog.Layouts;
 
     /// <summary>
     /// Stack trace renderer.
     /// </summary>
     [LayoutRenderer("stacktrace")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class StackTraceLayoutRenderer : LayoutRenderer, IUsesStackTrace
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="StackTraceLayoutRenderer" /> class.
-        /// </summary>
-        public StackTraceLayoutRenderer()
-        {
-            Separator = " => ";
-            TopFrames = 3;
-            Format = StackTraceFormat.Flat;
-        }
-
-        /// <summary>
         /// Gets or sets the output format of the stack trace.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue("Flat")]
-        public StackTraceFormat Format { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public StackTraceFormat Format { get; set; } = StackTraceFormat.Flat;
 
         /// <summary>
         /// Gets or sets the number of top stack frames to be rendered.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(3)]
-        public int TopFrames { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public int TopFrames { get; set; } = 3;
 
         /// <summary>
         /// Gets or sets the number of frames to skip.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(0)]
+        /// <docgen category='Layout Options' order='10' />
         public int SkipFrames { get; set; }
 
         /// <summary>
         /// Gets or sets the stack frame separator string.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(" => ")]
-        public string Separator { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public string Separator { get => _separator?.OriginalText; set => _separator = new SimpleLayout(value ?? ""); }
+        private SimpleLayout _separator = new SimpleLayout(" => ");
 
         /// <summary>
         /// Logger should capture StackTrace, if it was not provided manually
         /// </summary>
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='10' />
         public bool CaptureStackTrace { get; set; } = true;
 
         /// <summary>
         /// Gets or sets whether to render StackFrames in reverse order
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='10' />
         public bool Reverse { get; set; }
 
-        /// <summary>
-        /// Gets the level of stack trace information required by the implementing class.
-        /// </summary>
-        /// <value></value>
+        /// <inheritdoc/>
         StackTraceUsage IUsesStackTrace.StackTraceUsage
         {
             get
@@ -116,14 +98,10 @@ namespace NLog.LayoutRenderers
             }
         }
 
-        /// <summary>
-        /// Renders the call site and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
-            if (logEvent.StackTrace == null)
+            if (logEvent.StackTrace is null)
                 return;
 
             int startingFrame = logEvent.UserStackFrameNumber + TopFrames - 1;
@@ -138,15 +116,15 @@ namespace NLog.LayoutRenderers
             switch (Format)
             {
                 case StackTraceFormat.Raw:
-                    AppendRaw(builder, stackFrameList);
+                    AppendRaw(builder, stackFrameList, logEvent);
                     break;
 
                 case StackTraceFormat.Flat:
-                    AppendFlat(builder, stackFrameList);
+                    AppendFlat(builder, stackFrameList, logEvent);
                     break;
 
                 case StackTraceFormat.DetailedFlat:
-                    AppendDetailedFlat(builder, stackFrameList);
+                    AppendDetailedFlat(builder, stackFrameList, logEvent);
                     break;
             }
         }
@@ -178,67 +156,76 @@ namespace NLog.LayoutRenderers
             }
         }
 
-        private static void AppendRaw(StringBuilder builder, StackFrameList stackFrameList)
+        private void AppendRaw(StringBuilder builder, StackFrameList stackFrameList, LogEventInfo logEvent)
         {
+            string separator = null;
             for (int i = 0; i < stackFrameList.Count; ++i)
             {
+                builder.Append(separator);
                 StackFrame f = stackFrameList[i];
                 builder.Append(f.ToString());
+                separator = separator ?? _separator?.Render(logEvent) ?? string.Empty;
             }
         }
 
-        private void AppendFlat(StringBuilder builder, StackFrameList stackFrameList)
+        private void AppendFlat(StringBuilder builder, StackFrameList stackFrameList, LogEventInfo logEvent)
         {
+            string separator = null;
+
             bool first = true;
             for (int i = 0; i < stackFrameList.Count; ++i)
             {
                 StackFrame f = stackFrameList[i];
-                if (!first)
-                {
-                    builder.Append(Separator);
-                }
-
                 var method = f.GetMethod();
-                if (method == null)
+                if (method is null)
                 {
                     continue;   // Net Native can have StackFrames without managed methods
                 }
 
-                var type = method.DeclaringType;
-                if (type != null)
+                if (!first)
                 {
-                    builder.Append(type.Name);
+                    separator = separator ?? _separator?.Render(logEvent) ?? string.Empty;
+                    builder.Append(separator);
                 }
-                else
+
+                var type = method.DeclaringType;
+                if (type is null)
                 {
                     builder.Append("<no type>");
                 }
+                else
+                {
+                    builder.Append(type.Name);
+                }
 
-                builder.Append(".");
+                builder.Append('.');
                 builder.Append(method.Name);
                 first = false;
             }
         }
 
-        private void AppendDetailedFlat(StringBuilder builder, StackFrameList stackFrameList)
+        private void AppendDetailedFlat(StringBuilder builder, StackFrameList stackFrameList, LogEventInfo logEvent)
         {
+            string separator = null;
+
             bool first = true;
             for (int i = 0; i < stackFrameList.Count; ++i)
             {
                 StackFrame f = stackFrameList[i];
                 var method = f.GetMethod();
-                if (method == null)
+                if (method is null)
                 {
                     continue;   // Net Native can have StackFrames without managed methods
                 }
 
                 if (!first)
                 {
-                    builder.Append(Separator);
+                    separator = separator ?? _separator?.Render(logEvent) ?? string.Empty;
+                    builder.Append(separator);
                 }
-                builder.Append("[");
+                builder.Append('[');
                 builder.Append(method);
-                builder.Append("]");
+                builder.Append(']');
                 first = false;
             }
         }

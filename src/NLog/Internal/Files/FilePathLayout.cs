@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using NLog.Internal.Fakeables;
 using NLog.Layouts;
 using NLog.Targets;
 
@@ -82,20 +81,22 @@ namespace NLog.Internal
         /// </summary>
         private string _cachedPrevCleanFileName;
 
-        /// <summary>Initializes a new instance of the <see cref="T:System.Object" /> class.</summary>
+        public bool IsFixedFilePath => _cleanedFixedResult != null;
+
+        /// <summary>Initializes a new instance of the <see cref="System.Object" /> class.</summary>
         public FilePathLayout(Layout layout, bool cleanupInvalidChars, FilePathKind filePathKind)
         {
             _layout = layout;
             _filePathKind = filePathKind;
             _cleanupInvalidChars = cleanupInvalidChars;
 
-            if (_layout == null)
+            if (_layout is null)
             {
                 _filePathKind = FilePathKind.Unknown;
                 return;
             }
 
-            //do we have to the the layout?
+            //do we have to the layout?
             if (cleanupInvalidChars || _filePathKind == FilePathKind.Unknown)
             {
                 _cleanedFixedResult = CreateCleanedFixedResult(cleanupInvalidChars, layout);
@@ -104,9 +105,8 @@ namespace NLog.Internal
 
             if (_filePathKind == FilePathKind.Relative)
             {
-                _baseDir = LogFactory.CurrentAppDomain.BaseDirectory;
+                _baseDir = LogFactory.DefaultAppEnvironment.AppDomainBaseDirectory;
             }
-
         }
 
         private static FilePathKind DetectKind(Layout layout, FilePathKind currentFilePathKind)
@@ -153,8 +153,6 @@ namespace NLog.Internal
             return _layout;
         }
 
-        #region Implementation of IRenderable
-
         /// <summary>
         /// Render the raw filename from Layout
         /// </summary>
@@ -168,7 +166,7 @@ namespace NLog.Internal
                 return _cleanedFixedResult;
             }
 
-            if (_layout == null)
+            if (_layout is null)
             {
                 return null;
             }
@@ -184,7 +182,7 @@ namespace NLog.Internal
                     }
                 }
 
-                _layout.RenderAppendBuilder(logEvent, reusableBuilder);
+                _layout.Render(logEvent, reusableBuilder);
 
                 if (_cachedPrevRawFileName != null && reusableBuilder.EqualTo(_cachedPrevRawFileName))
                 {
@@ -210,7 +208,7 @@ namespace NLog.Internal
         private string GetCleanFileName(string rawFileName)
         {
             var cleanFileName = rawFileName;
-            if (_cleanupInvalidChars && _cleanedFixedResult == null)
+            if (_cleanupInvalidChars && _cleanedFixedResult is null)
             {
                 cleanFileName = CleanupInvalidFilePath(rawFileName);
             }
@@ -255,8 +253,6 @@ namespace NLog.Internal
             _cachedPrevRawFileName = rawFileName;
             return cleanFileName;
         }
-
-        #endregion
 
         /// <summary>
         /// Is this (templated/invalid) path an absolute, relative or unknown?
@@ -350,7 +346,7 @@ namespace NLog.Internal
                 {
                     //delay char[] creation until first invalid char
                     //is found to avoid memory allocation.
-                    if (fileNameChars == null)
+                    if (fileNameChars is null)
                     {
                         fileNameChars = filePath.Substring(lastDirSeparator + 1).ToCharArray();
                     }

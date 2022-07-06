@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,31 +34,24 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.Globalization;
     using System.Text;
     using NLog.Config;
-	using NLog.Internal;
 
     /// <summary>
     /// Installation parameter (passed to InstallNLogConfig).
     /// </summary>
     [LayoutRenderer("install-context")]
-    [ThreadSafe]
     public class InstallContextLayoutRenderer : LayoutRenderer
     {
         /// <summary>
         /// Gets or sets the name of the parameter.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [RequiredParameter]
         [DefaultParameter]
         public string Parameter { get; set; }
 
-        /// <summary>
-        /// Renders the specified installation parameter and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var value = GetValue(logEvent);

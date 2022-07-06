@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,7 +41,6 @@ namespace NLog.LayoutRenderers.Wrappers
     /// </summary>
     [LayoutRenderer("onexception")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class OnExceptionLayoutRendererWrapper : WrapperLayoutRendererBase
     {
         /// <inheritdoc/>
@@ -49,15 +48,11 @@ namespace NLog.LayoutRenderers.Wrappers
         {
             if (logEvent.Exception != null)
             {
-                Inner.RenderAppendBuilder(logEvent, builder);
+                Inner.Render(logEvent, builder);
             }
         }
 
-        /// <summary>
-        /// Transforms the output of another layout.
-        /// </summary>
-        /// <param name="text">Output to be transform.</param>
-        /// <returns>Transformed text.</returns>
+        /// <inheritdoc/>
         protected override string Transform(string text)
         {
             return text;

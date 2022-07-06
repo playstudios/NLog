@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -38,7 +38,6 @@ using System.Threading;
 using NLog.Common;
 using NLog.Internal;
 using Xunit;
-using Xunit.Extensions;
 
 namespace NLog.UnitTests.Internal
 {

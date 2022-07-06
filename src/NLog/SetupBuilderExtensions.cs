@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,6 +34,8 @@
 namespace NLog
 {
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Runtime.CompilerServices;
     using NLog.Config;
     using NLog.Internal;
@@ -58,6 +60,15 @@ namespace NLog
         public static Logger GetLogger(this ISetupBuilder setupBuilder, string name)
         {
             return setupBuilder.LogFactory.GetLogger(name);
+        }
+
+        /// <summary>
+        /// Configures general options for NLog LogFactory before loading NLog config
+        /// </summary>
+        public static ISetupBuilder SetupLogFactory(this ISetupBuilder setupBuilder, Action<ISetupLogFactoryBuilder> logfactoryBuilder)
+        {
+            logfactoryBuilder(new SetupLogFactoryBuilder(setupBuilder.LogFactory));
+            return setupBuilder;
         }
 
         /// <summary>
@@ -100,7 +111,11 @@ namespace NLog
 
             if (ReferenceEquals(newConfig, setupBuilder.LogFactory._config))
             {
-                setupBuilder.LogFactory.ReconfigExistingLoggers();
+                // New config has already been assigned or unchanged, check if refresh is needed
+                if (!ReferenceEquals(config, newConfig) || !ReferenceEquals(newConfig, null))
+                {
+                    setupBuilder.LogFactory.ReconfigExistingLoggers();
+                }
             }
             else if (!configHasChanged || !ReferenceEquals(config, newConfig))
             {
@@ -122,10 +137,25 @@ namespace NLog
         /// <summary>
         /// Loads NLog config from filename <paramref name="configFile"/> if provided, else fallback to scanning for NLog.config
         /// </summary>
+        /// <param name="setupBuilder">Fluent interface parameter.</param>
+        /// <param name="configFile">Explicit configuration file to be read (Default NLog.config from candidates paths)</param>
+        /// <param name="optional">Whether to allow application to run when NLog config is not available</param>
         public static ISetupBuilder LoadConfigurationFromFile(this ISetupBuilder setupBuilder, string configFile = null, bool optional = true)
         {
             setupBuilder.LogFactory.LoadConfiguration(configFile, optional);
             return setupBuilder;
+        }
+
+        /// <summary>
+        /// Loads NLog config from file-paths <paramref name="candidateFilePaths"/> if provided, else fallback to scanning for NLog.config
+        /// </summary>
+        /// <param name="setupBuilder">Fluent interface parameter.</param>
+        /// <param name="candidateFilePaths">Candidates file paths (including filename) where to scan for NLog config files</param>
+        /// <param name="optional">Whether to allow application to run when NLog config is not available</param>
+        public static ISetupBuilder LoadConfigurationFromFile(this ISetupBuilder setupBuilder, IEnumerable<string> candidateFilePaths, bool optional = true)
+        {
+            setupBuilder.LogFactory.SetCandidateConfigFilePaths(candidateFilePaths);
+            return setupBuilder.LoadConfigurationFromFile(default(string), optional);
         }
 
         /// <summary>
@@ -134,6 +164,59 @@ namespace NLog
         public static ISetupBuilder LoadConfigurationFromXml(this ISetupBuilder setupBuilder, string configXml)
         {
             setupBuilder.LogFactory.Configuration = XmlLoggingConfiguration.CreateFromXmlString(configXml, setupBuilder.LogFactory);
+            return setupBuilder;
+        }
+
+        /// <summary>
+        /// Loads NLog config located in embedded resource from main application assembly.
+        /// </summary>
+        /// <param name="setupBuilder">Fluent interface parameter.</param>
+        /// <param name="applicationAssembly">Assembly for the main Application project with embedded resource</param>
+        /// <param name="resourceName">Name of the manifest resource for NLog config XML</param>
+        public static ISetupBuilder LoadConfigurationFromAssemblyResource(this ISetupBuilder setupBuilder, System.Reflection.Assembly applicationAssembly, string resourceName = "NLog.config")
+        {
+            if (applicationAssembly is null) throw new ArgumentNullException(nameof(applicationAssembly));
+            if (string.IsNullOrEmpty(resourceName)) throw new ArgumentNullException(nameof(resourceName));
+
+            var resourcePaths = applicationAssembly.GetManifestResourceNames().Where(x => x.EndsWith(resourceName, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (resourcePaths.Count == 1)
+            {
+                var nlogConfigStream = applicationAssembly.GetManifestResourceStream(resourcePaths[0]);
+                if (nlogConfigStream?.Length > 0)
+                {
+                    NLog.Common.InternalLogger.Info("Loading NLog XML config from assembly embedded resource '{0}'", resourceName);
+                    using (var xmlReader = System.Xml.XmlReader.Create(nlogConfigStream))
+                    {
+                        setupBuilder.LoadConfiguration(new XmlLoggingConfiguration(xmlReader, null, setupBuilder.LogFactory));
+                    }
+                }
+                else
+                {
+                    NLog.Common.InternalLogger.Debug("No NLog config loaded. Empty Embedded resource '{0}' found in assembly: {1}", resourceName, applicationAssembly.FullName);
+                }
+            }
+            else if (resourcePaths.Count == 0)
+            {
+                NLog.Common.InternalLogger.Debug("No NLog config loaded. No matching embedded resource '{0}' found in assembly: {1}", resourceName, applicationAssembly.FullName);
+            }
+            else
+            {
+                NLog.Common.InternalLogger.Error("No NLog config loaded. Multiple matching embedded resource '{0}' found in assembly: {1}", resourceName, applicationAssembly.FullName);
+            }
+            return setupBuilder;
+        }
+
+        /// <summary>
+        /// Reloads the current logging configuration and activates it
+        /// </summary>
+        /// <remarks>Logevents produced during the configuration-reload can become lost, as targets are unavailable while closing and initializing.</remarks>
+        public static ISetupBuilder ReloadConfiguration(this ISetupBuilder setupBuilder)
+        {
+            var newConfig = setupBuilder.LogFactory._config?.Reload();
+            if (newConfig is null || (newConfig as IInitializeSucceeded)?.InitializeSucceeded == false)
+                return setupBuilder;
+
+            setupBuilder.LogFactory.Configuration = newConfig;
             return setupBuilder;
         }
     }

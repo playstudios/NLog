@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Globalization;
     using System.Text;
     using NLog.Config;
@@ -45,7 +44,6 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("date")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class DateLayoutRenderer : LayoutRenderer, IRawValue, IStringValueRenderer
     {
         /// <summary>
@@ -54,19 +52,18 @@ namespace NLog.LayoutRenderers
         public DateLayoutRenderer()
         {
             Format = "yyyy/MM/dd HH:mm:ss.fff";
-            Culture = CultureInfo.InvariantCulture;
         }
 
         /// <summary>
         /// Gets or sets the culture used for rendering. 
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        public CultureInfo Culture { get; set; }
+        /// <docgen category='Layout Options' order='100' />
+        public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
 
         /// <summary>
         /// Gets or sets the date format. Can be any argument accepted by DateTime.ToString(format).
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [DefaultParameter]
         public string Format
         {
@@ -89,8 +86,7 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Gets or sets a value indicating whether to output UTC time instead of local time.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='50' />
         public bool UniversalTime { get; set; }
 
         /// <inheritdoc/>
@@ -99,14 +95,12 @@ namespace NLog.LayoutRenderers
             builder.Append(GetStringValue(logEvent));
         }
 
-        /// <inheritdoc/>
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             value =  GetDate(logEvent);
             return true;
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => GetStringValue(logEvent);
 
         private string GetStringValue(LogEventInfo logEvent)

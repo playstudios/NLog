@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -81,15 +81,15 @@ namespace NLog.UnitTests.Internal.NetworkSenders
                         mre.Set();
                     });
 
-                mre.WaitOne();
+                Assert.True(mre.WaitOne(10000), "Network Flush not completed");
 
                 var actual = sender.Log.ToString();
-                Assert.True(actual.IndexOf("Parse endpoint address tcp://hostname:123/ Unspecified") != -1);
-                Assert.True(actual.IndexOf("create socket 10000 Stream Tcp") != -1);
-                Assert.True(actual.IndexOf("connect async to {mock end point: tcp://hostname:123/}") != -1);
-                Assert.True(actual.IndexOf("send async 0 1 'q'") != -1);
-                Assert.True(actual.IndexOf("send async 0 2 'qu'") != -1);
-                Assert.True(actual.IndexOf("send async 0 4 'quic'") != -1);
+                Assert.Contains("Parse endpoint address tcp://hostname:123/ Unspecified", actual);
+                Assert.Contains("create socket InterNetwork Stream Tcp", actual);
+                Assert.Contains("connect async to 0.0.0.0:123", actual);
+                Assert.Contains("send async 0 1 'q'", actual);
+                Assert.Contains("send async 0 2 'qu'", actual);
+                Assert.Contains("send async 0 4 'quic'", actual);
 
                 mre.Reset();
                 for (int i = 1; i < 8; i *= 2)
@@ -111,20 +111,20 @@ namespace NLog.UnitTests.Internal.NetworkSenders
                         mre.Set();
                     });
 
-                mre.WaitOne();
+                Assert.True(mre.WaitOne(10000), "Network Close not completed");
 
                 actual = sender.Log.ToString();
-                
-                Assert.True(actual.IndexOf("Parse endpoint address tcp://hostname:123/ Unspecified") != -1);
-                Assert.True(actual.IndexOf("create socket 10000 Stream Tcp") != -1);
-                Assert.True(actual.IndexOf("connect async to {mock end point: tcp://hostname:123/}") != -1);
-                Assert.True(actual.IndexOf("send async 0 1 'q'") != -1);
-                Assert.True(actual.IndexOf("send async 0 2 'qu'") != -1);
-                Assert.True(actual.IndexOf("send async 0 4 'quic'") != -1);
-                Assert.True(actual.IndexOf("send async 0 1 'q'") != -1);
-                Assert.True(actual.IndexOf("send async 0 2 'qu'") != -1);
-                Assert.True(actual.IndexOf("send async 0 4 'quic'") != -1);
-                Assert.True(actual.IndexOf("close") != -1);
+
+                Assert.Contains("Parse endpoint address tcp://hostname:123/ Unspecified", actual);
+                Assert.Contains("create socket InterNetwork Stream Tcp", actual);
+                Assert.Contains("connect async to 0.0.0.0:123", actual);
+                Assert.Contains("send async 0 1 'q'", actual);
+                Assert.Contains("send async 0 2 'qu'", actual);
+                Assert.Contains("send async 0 4 'quic'", actual);
+                Assert.Contains("send async 0 1 'q'", actual);
+                Assert.Contains("send async 0 2 'qu'", actual);
+                Assert.Contains("send async 0 4 'quic'", actual);
+                Assert.Contains("close", actual);
 
                 foreach (var ex in exceptions)
                 {
@@ -172,18 +172,19 @@ namespace NLog.UnitTests.Internal.NetworkSenders
                     });
             }
 
-            Assert.True(allSent.WaitOne(3000, false));
+
+            Assert.True(allSent.WaitOne(10000), "Network Write not completed");
 
             var mre = new ManualResetEvent(false);
             sender.FlushAsync(ex => mre.Set());
-            mre.WaitOne(3000, false);
+            Assert.True(mre.WaitOne(10000), "Network Flush not completed");
 
             var actual = sender.Log.ToString();
 
-            Assert.True(actual.IndexOf("Parse endpoint address tcp://hostname:123/ Unspecified") != -1);
-            Assert.True(actual.IndexOf("create socket 10000 Stream Tcp") != -1);
-            Assert.True(actual.IndexOf("connect async to {mock end point: tcp://hostname:123/}") != -1);
-            Assert.True(actual.IndexOf("failed") != -1);
+            Assert.Contains("Parse endpoint address tcp://hostname:123/ Unspecified", actual);
+            Assert.Contains("create socket InterNetwork Stream Tcp", actual);
+            Assert.Contains("connect async to 0.0.0.0:123", actual);
+            Assert.Contains("failed", actual);
 
             foreach (var ex in exceptions)
             {
@@ -227,19 +228,19 @@ namespace NLog.UnitTests.Internal.NetworkSenders
             }
 
             var mre = new ManualResetEvent(false);
-            writeFinished.WaitOne();
+            Assert.True(writeFinished.WaitOne(10000), "Network Write not completed");
             sender.Close(ex => mre.Set());
-            mre.WaitOne();
+            Assert.True(mre.WaitOne(10000), "Network Flush not completed");
 
             var actual = sender.Log.ToString();
-            Assert.True(actual.IndexOf("Parse endpoint address tcp://hostname:123/ Unspecified") != -1);
-            Assert.True(actual.IndexOf("create socket 10000 Stream Tcp") != -1);
-            Assert.True(actual.IndexOf("connect async to {mock end point: tcp://hostname:123/}") != -1);
-            Assert.True(actual.IndexOf("send async 0 1 'q'") != -1);
-            Assert.True(actual.IndexOf("send async 0 2 'qu'") != -1);
-            Assert.True(actual.IndexOf("send async 0 3 'qui'") != -1);
-            Assert.True(actual.IndexOf("failed") != -1);
-            Assert.True(actual.IndexOf("close") != -1);
+            Assert.Contains("Parse endpoint address tcp://hostname:123/ Unspecified", actual);
+            Assert.Contains("create socket InterNetwork Stream Tcp", actual);
+            Assert.Contains("connect async to 0.0.0.0:123", actual);
+            Assert.Contains("send async 0 1 'q'", actual);
+            Assert.Contains("send async 0 2 'qu'", actual);
+            Assert.Contains("send async 0 3 'qui'", actual);
+            Assert.Contains("failed", actual);
+            Assert.Contains("close", actual);
 
             for (int i = 0; i < exceptions.Length; ++i)
             {
@@ -269,10 +270,10 @@ namespace NLog.UnitTests.Internal.NetworkSenders
                 return new MockSocket(addressFamily, socketType, protocolType, this);
             }
 
-            protected override EndPoint ParseEndpointAddress(Uri uri, AddressFamily addressFamily)
+            protected override IPAddress ResolveIpAddress(Uri uri, AddressFamily addressFamily)
             {
                 Log.WriteLine("Parse endpoint address {0} {1}", uri, addressFamily);
-                return new MockEndPoint(uri);
+                return IPAddress.Any;
             }
 
             public int ConnectFailure { get; set; }
@@ -282,7 +283,7 @@ namespace NLog.UnitTests.Internal.NetworkSenders
             public int SendFailureIn { get; set; }
         }
 
-        internal class MockSocket : ISocket
+        internal sealed class MockSocket : ISocket
         {
             private readonly MyTcpNetworkSender sender;
             private readonly StringWriter log;
@@ -375,23 +376,6 @@ namespace NLog.UnitTests.Internal.NetworkSenders
                     log.WriteLine("sendto async {0} {1} '{2}' {3}", args.Offset, args.Count, Encoding.UTF8.GetString(args.Buffer, args.Offset, args.Count), args.RemoteEndPoint);
                     return InvokeCallback(args);
                 }
-            }
-        }
-
-        internal class MockEndPoint : EndPoint
-        {
-            private readonly Uri uri;
-
-            public MockEndPoint(Uri uri)
-            {
-                this.uri = uri;
-            }
-
-            public override AddressFamily AddressFamily => (AddressFamily)10000;
-
-            public override string ToString()
-            {
-                return "{mock end point: " + uri + "}";
             }
         }
     }

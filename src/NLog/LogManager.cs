@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,7 +35,7 @@ namespace NLog
 {
     using System;
     using System.Collections.Generic;
-    using System.Globalization;
+    using System.ComponentModel;
     using System.Linq;
     using System.Reflection;
     using System.Runtime.CompilerServices;
@@ -45,8 +45,11 @@ namespace NLog
     using NLog.Internal;
 
     /// <summary>
-    /// Creates and manages instances of <see cref="T:NLog.Logger" /> objects.
+    /// Creates and manages instances of <see cref="NLog.Logger" /> objects.
     /// </summary>
+    /// <remarks>
+    /// LogManager wraps a singleton instance of <see cref="NLog.LogFactory" />.
+    /// </remarks>
     public static class LogManager
     {
         /// <remarks>
@@ -109,7 +112,6 @@ namespace NLog
 
         /// <summary>
         /// Gets or sets a value indicating whether Variables should be kept on configuration reload.
-        /// Default value - false.
         /// </summary>
         public static bool KeepVariablesOnReload
         {
@@ -129,8 +131,10 @@ namespace NLog
 
         /// <summary>
         /// Gets or sets the current logging configuration.
-        /// <see cref="NLog.LogFactory.Configuration" />
         /// </summary>
+        /// <remarks>
+        /// Setter will re-configure all <see cref="Logger"/>-objects, so no need to also call <see cref="ReconfigExistingLoggers()" />
+        /// </remarks>
         public static LoggingConfiguration Configuration
         {
             get => factory.Configuration;
@@ -273,6 +277,17 @@ namespace NLog
         }
 
         /// <summary>
+        /// Loops through all loggers previously returned by GetLogger.
+        /// and recalculates their target and filter list. Useful after modifying the configuration programmatically
+        /// to ensure that all loggers have been properly configured.
+        /// </summary>
+        /// <param name="purgeObsoleteLoggers">Purge garbage collected logger-items from the cache</param>
+        public static void ReconfigExistingLoggers(bool purgeObsoleteLoggers)
+        {
+            factory.ReconfigExistingLoggers(purgeObsoleteLoggers);
+        }
+
+        /// <summary>
         /// Flush any pending log messages (in case of asynchronous targets) with the default timeout of 15 seconds.
         /// </summary>
         public static void Flush()
@@ -328,34 +343,70 @@ namespace NLog
         }
 
         /// <summary>
-        /// Decreases the log enable counter and if it reaches -1 the logs are disabled.
+        /// Suspends the logging, and returns object for using-scope so scope-exit calls <see cref="EnableLogging"/>
         /// </summary>
-        /// <remarks>Logging is enabled if the number of <see cref="EnableLogging"/> calls is greater 
-        ///     than or equal to <see cref="DisableLogging"/> calls.</remarks>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="DisableLogging"/> calls are greater 
+        /// than the number of <see cref="EnableLogging"/> calls.
+        /// </remarks>
         /// <returns>An object that implements IDisposable whose Dispose() method re-enables logging. 
-        ///     To be used with C# <c>using ()</c> statement.</returns>
+        /// To be used with C# <c>using ()</c> statement.</returns>
+        [Obsolete("Use SuspendLogging() instead. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public static IDisposable DisableLogging()
         {
             return factory.SuspendLogging();
         }
 
         /// <summary>
-        /// Increases the log enable counter and if it reaches 0 the logs are disabled.
+        /// Resumes logging if having called <see cref="DisableLogging"/>.
         /// </summary>
-        /// <remarks>Logging is enabled if the number of <see cref="EnableLogging"/> calls is greater 
-        ///     than or equal to <see cref="DisableLogging"/> calls.</remarks>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="DisableLogging"/> calls are greater 
+        /// than the number of <see cref="EnableLogging"/> calls.
+        /// </remarks>
+        [Obsolete("Use ResumeLogging() instead. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public static void EnableLogging()
         {
             factory.ResumeLogging();
         }
 
         /// <summary>
-        /// Checks if logging is currently enabled.
+        /// Suspends the logging, and returns object for using-scope so scope-exit calls <see cref="ResumeLogging"/>
         /// </summary>
-        /// <returns><see langword="true" /> if logging is currently enabled, <see langword="false"/> 
-        ///     otherwise.</returns>
-        /// <remarks>Logging is enabled if the number of <see cref="EnableLogging"/> calls is greater 
-        ///     than or equal to <see cref="DisableLogging"/> calls.</remarks>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="SuspendLogging"/> calls are greater 
+        /// than the number of <see cref="ResumeLogging"/> calls.
+        /// </remarks>
+        /// <returns>An object that implements IDisposable whose Dispose() method re-enables logging. 
+        /// To be used with C# <c>using ()</c> statement.</returns>
+        public static IDisposable SuspendLogging()
+        {
+            return factory.SuspendLogging();
+        }
+
+        /// <summary>
+        /// Resumes logging if having called <see cref="SuspendLogging"/>.
+        /// </summary>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="SuspendLogging"/> calls are greater 
+        /// than the number of <see cref="ResumeLogging"/> calls.
+        /// </remarks>
+        public static void ResumeLogging()
+        {
+            factory.ResumeLogging();
+        }
+
+        /// <summary>
+        /// Returns <see langword="true" /> if logging is currently enabled.
+        /// </summary>
+        /// <remarks>
+        /// Logging is suspended when the number of <see cref="SuspendLogging"/> calls are greater 
+        /// than the number of <see cref="ResumeLogging"/> calls.
+        /// </remarks>
+        /// <returns>A value of <see langword="true" /> if logging is currently enabled, 
+        /// <see langword="false"/> otherwise.</returns>
         public static bool IsLoggingEnabled()
         {
             return factory.IsLoggingEnabled();

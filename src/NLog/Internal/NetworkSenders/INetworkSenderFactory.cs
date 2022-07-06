@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,6 +34,7 @@
 namespace NLog.Internal.NetworkSenders
 {
     using System;
+    using NLog.Targets;
 
     /// <summary>
     /// Creates instances of <see cref="NetworkSender"/> objects for given URLs.
@@ -45,11 +46,13 @@ namespace NLog.Internal.NetworkSenders
         /// </summary>
         /// <param name="url">URL that determines the network sender to be created.</param>
         /// <param name="maxQueueSize">The maximum queue size.</param>
+        /// <param name="onQueueOverflow">The overflow action when reaching maximum queue size.</param>
+        /// <param name="maxMessageSize">The maximum message size.</param>
         /// <param name="sslProtocols">SSL protocols for TCP</param>
         /// <param name="keepAliveTime">KeepAliveTime for TCP</param>
         /// <returns>
         /// A newly created network sender.
         /// </returns>
-        NetworkSender Create(string url, int maxQueueSize, System.Security.Authentication.SslProtocols sslProtocols, TimeSpan keepAliveTime);
+        NetworkSender Create(string url, int maxQueueSize, NetworkTargetQueueOverflowAction onQueueOverflow, int maxMessageSize, System.Security.Authentication.SslProtocols sslProtocols, TimeSpan keepAliveTime);
     }
 }

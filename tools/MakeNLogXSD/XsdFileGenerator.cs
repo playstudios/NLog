@@ -206,7 +206,7 @@ namespace MakeNLogXSD
 
                 result.Add(new XAttribute("type", enumType));
             }
-            else 
+            else
             {
                 string xsdType = GetXsdType(propertyType, true);
                 if (xsdType == null)
@@ -221,9 +221,41 @@ namespace MakeNLogXSD
                 var summary = doc.Element("summary");
                 if (summary != null)
                 {
+                    var summaryDoc = summary.Value;
+                    if (summary.HasElements)
+                    {
+                        // Try to expand <see cref="..." />
+                        summaryDoc = string.Empty;
+                        foreach (var item in summary.Nodes())
+                        {
+                            var element = item as XElement;
+                            if (element?.HasAttributes == true)
+                            {
+                                if (element?.IsEmpty == true)
+                                {
+                                    summaryDoc += element.FirstAttribute.Value;
+                                }
+                                else
+                                {
+                                    // Something else, abort the attempt to expand
+                                    summaryDoc = summary.Value;
+                                    break;
+                                }
+                            }
+                            else if (element != null)
+                            {
+                                summaryDoc += element.Value.ToString();
+                            }
+                            else
+                            {
+                                summaryDoc += item.ToString();
+                            }
+                        }
+                    }
+
                     result.Add(new XElement(xsd + "annotation",
                         new XElement(xsd + "documentation",
-                            summary.Value)));
+                            summaryDoc)));
                 }
             }
 
@@ -266,12 +298,12 @@ namespace MakeNLogXSD
         private static XElement GetPropertyElement(XElement propertyElement)
         {
             var result = new XElement(xsd + "element",
-                new XAttribute("name", (string)propertyElement.Attribute("camelName")),
-                new XAttribute("minOccurs", "0"));
+                new XAttribute("name", (string)propertyElement.Attribute("camelName")));
 
             string propertyType = (string)propertyElement.Attribute("type");
             if (propertyType == "Collection")
             {
+                result.Add(new XAttribute("minOccurs", "0"));
                 result.Add(new XAttribute("maxOccurs", "unbounded"));
                 var elementType = propertyElement.Element("elementType");
                 result.Attribute("name").Value = (string)elementType.Attribute("elementTag");
@@ -280,9 +312,12 @@ namespace MakeNLogXSD
             else if (propertyType == "Enum")
             {
                 string enumType = (string)propertyElement.Attribute("enumType");
-
-                result.Add(new XAttribute("maxOccurs", "1"));
                 result.Add(new XAttribute("type", enumType));
+                result.Add(new XAttribute("minOccurs", "0"));
+                result.Add(new XAttribute("maxOccurs", "1"));
+                string defaultValue = (string)propertyElement.Attribute("defaultValue");
+                if (!string.IsNullOrEmpty(defaultValue))
+                    result.Add(new XAttribute("default", defaultValue));
             }
             else
             {
@@ -290,8 +325,17 @@ namespace MakeNLogXSD
                 if (xsdType == null)
                     return null;
 
-                result.Add(new XAttribute("maxOccurs", "1"));
                 result.Add(new XAttribute("type", xsdType));
+                string defaultValue = (string)propertyElement.Attribute("defaultValue");
+                string requiredValue = (string)propertyElement.Attribute("required");
+                if (requiredValue == "1" && defaultValue == null && (xsdType.StartsWith("xs:") || xsdType == "Layout"))
+                    result.Add(new XAttribute("minOccurs", "1"));
+                else
+                    result.Add(new XAttribute("minOccurs", "0"));
+                result.Add(new XAttribute("maxOccurs", "1"));
+                
+                if (!string.IsNullOrEmpty(defaultValue) && xsdType.StartsWith("xs:"))
+                    result.Add(new XAttribute("default", defaultValue));
             }
 
             return result;
@@ -303,7 +347,7 @@ namespace MakeNLogXSD
         {
             if (string.IsNullOrWhiteSpace(apiTypeName))
             {
-                throw new NotSupportedException("Unknown API type '" + apiTypeName + "'.");
+                throw new NotSupportedException("Unknown API empty type '" + apiTypeName + "'.");
             }
 
             if (IgnoreTypes.Contains(apiTypeName))
@@ -314,7 +358,7 @@ namespace MakeNLogXSD
             switch (apiTypeName)
             {
                 case "Layout":
-                    return attribute ? "SimpleLayoutAttribute" : "Layout";
+                    return GetLayoutType(attribute);
 
                 case "NLog.Filters.Filter":
                     return attribute ? null : "Filter";
@@ -360,7 +404,7 @@ namespace MakeNLogXSD
 
                 default:
                     if (
-                        apiTypeName.StartsWith("System.Collections.Generic.ISet")|| 
+                        apiTypeName.StartsWith("System.Collections.Generic.ISet") ||
                         apiTypeName.StartsWith("System.Collections.Generic.HashSet") ||
                         apiTypeName.StartsWith("System.Collections.Generic.IList") ||
                         apiTypeName.StartsWith("System.Collections.Generic.List") ||
@@ -371,8 +415,19 @@ namespace MakeNLogXSD
                         return "xs:string";
                     }
 
+                    if (apiTypeName.StartsWith("NLog.Layouts.Layout`1"))
+                    {
+                        // Layout<T>
+                        return GetLayoutType(attribute);
+                    }
+
                     throw new NotSupportedException("Unknown API type '" + apiTypeName + "'.");
             }
+        }
+
+        private static string GetLayoutType(bool attribute)
+        {
+            return attribute ? "SimpleLayoutAttribute" : "Layout";
         }
     }
 }

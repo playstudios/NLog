@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,10 +34,8 @@
 namespace NLog.LayoutRenderers.Wrappers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
-    using NLog.Internal;
 
     /// <summary>
     /// Render the non-raw value of an object.
@@ -47,21 +45,19 @@ namespace NLog.LayoutRenderers.Wrappers
     [AmbientProperty("NoRawValue")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class NoRawValueLayoutRendererWrapper : WrapperLayoutRendererBase
     {
         /// <summary>
         /// Gets or sets a value indicating whether to disable the IRawValue-interface
         /// </summary>
         /// <value>A value of <c>true</c> if IRawValue-interface should be ignored; otherwise, <c>false</c>.</value>
-        /// <docgen category='Transformation Options' order='10' />
-        [DefaultValue(true)]
+        /// <docgen category='Layout Options' order='10' />
         public bool NoRawValue { get; set; } = true;
 
         /// <inheritdoc/>
         protected override void RenderInnerAndTransform(LogEventInfo logEvent, StringBuilder builder, int orgLength)
         {
-            Inner?.RenderAppendBuilder(logEvent, builder);
+            Inner?.Render(logEvent, builder);
         }
 
         /// <inheritdoc/>

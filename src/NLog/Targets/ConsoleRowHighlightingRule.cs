@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,9 +33,8 @@
 
 namespace NLog.Targets
 {
-    using System.ComponentModel;
-    using Conditions;
-    using Config;
+    using NLog.Conditions;
+    using NLog.Config;
 
     /// <summary>
     /// The row-highlighting condition.
@@ -80,22 +79,20 @@ namespace NLog.Targets
         /// <summary>
         /// Gets or sets the condition that must be met in order to set the specified foreground and background color.
         /// </summary>
-        /// <docgen category='Rule Matching Options' order='10' />
+        /// <docgen category='Highlighting Rules' order='10' />
         [RequiredParameter]
         public ConditionExpression Condition { get; set; }
 
         /// <summary>
         /// Gets or sets the foreground color.
         /// </summary>
-        /// <docgen category='Formatting Options' order='10' />
-        [DefaultValue("NoChange")]
+        /// <docgen category='Highlighting Rules' order='10' />
         public ConsoleOutputColor ForegroundColor { get; set; }
 
         /// <summary>
         /// Gets or sets the background color.
         /// </summary>
-        /// <docgen category='Formatting Options' order='10' />
-        [DefaultValue("NoChange")]
+        /// <docgen category='Highlighting Rules' order='10' />
         public ConsoleOutputColor BackgroundColor { get; set; }
 
         /// <summary>
@@ -110,7 +107,7 @@ namespace NLog.Targets
         /// </returns>
         public bool CheckCondition(LogEventInfo logEvent)
         {
-            return Condition == null || true.Equals(Condition.Evaluate(logEvent));
+            return Condition is null || true.Equals(Condition.Evaluate(logEvent));
         }
     }
 }

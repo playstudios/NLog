@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,27 +36,20 @@ namespace NLog.Targets
     /// <summary>
     /// Sends log messages to the remote instance of Chainsaw application from log4j. 
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/Chainsaw-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/Chainsaw-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Chainsaw/NLog.config" />
     /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
-    /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/Chainsaw/Simple/Example.cs" />
-    /// <p>
-    /// NOTE: If your receiver application is ever likely to be off-line, don't use TCP protocol
-    /// or you'll get TCP timeouts and your application will crawl. 
-    /// Either switch to UDP transport or use <a href="target.AsyncWrapper.html">AsyncWrapper</a> target
-    /// so that your application threads will not be blocked by the timing-out connection attempts.
-    /// </p>
     /// </example>
     [Target("Chainsaw")]
     public class ChainsawTarget : NLogViewerTarget
@@ -66,8 +59,8 @@ namespace NLog.Targets
         /// </summary>
         public ChainsawTarget()
         {
-            OptimizeBufferReuse = GetType() == typeof(ChainsawTarget);  // Class not sealed, reduce breaking changes
             IncludeNLogData = false;
+            IncludeEventProperties = true;
         }
 
         /// <summary>

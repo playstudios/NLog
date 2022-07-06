@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.Targets
 {
     using System;
-    using System.ComponentModel;
     using NLog.Config;
     using NLog.Layouts;
 
@@ -44,6 +43,8 @@ namespace NLog.Targets
     [NLogConfigurationItem]
     public class TargetPropertyWithContext
     {
+        private readonly ValueTypeLayoutInfo _layoutInfo = new ValueTypeLayoutInfo();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="TargetPropertyWithContext" /> class.
         /// </summary>
@@ -58,32 +59,55 @@ namespace NLog.Targets
         {
             Name = name;
             Layout = layout;
+            IncludeEmptyValue = false;
         }
 
         /// <summary>
         /// Gets or sets the name of the attribute.
         /// </summary>
-        /// <docgen category='Property Options' order='10' />
+        /// <docgen category='Layout Options' order='1' />
         [RequiredParameter]
         public string Name { get; set; }
 
         /// <summary>
         /// Gets or sets the layout that will be rendered as the attribute's value.
         /// </summary>
-        /// <docgen category='Property Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [RequiredParameter]
-        public Layout Layout { get; set; }
-
-        /// <summary>
-        /// Gets or sets when an empty value should cause the property to be included
-        /// </summary>
-        [DefaultValue(true)]
-        public bool IncludeEmptyValue { get; set; } = true;
+        public Layout Layout { get => _layoutInfo.Layout; set => _layoutInfo.Layout = value; }
 
         /// <summary>
         /// Gets or sets the type of the property.
         /// </summary>
-        [DefaultValue(typeof(string))]
-        public Type PropertyType { get; set; } = typeof(string);
+        /// <docgen category='Layout Options' order='100' />
+        public Type PropertyType { get => _layoutInfo.ValueType ?? typeof(string); set => _layoutInfo.ValueType = value; }
+
+        /// <summary>
+        /// Gets or sets the fallback value when result value is not available
+        /// </summary>
+        /// <docgen category='Layout Options' order='100' />
+        public Layout DefaultValue { get => _layoutInfo.DefaultValue; set => _layoutInfo.DefaultValue = value; }
+
+        /// <summary>
+        /// Gets or sets when an empty value should cause the property to be included
+        /// </summary>
+        /// <docgen category='Layout Options' order='100' />
+        public bool IncludeEmptyValue
+        {
+            get => _includeEmptyValue;
+            set
+            {
+                _includeEmptyValue = value;
+                _layoutInfo.ForceDefaultValueNull = !value;
+            }
+        }
+        private bool _includeEmptyValue;
+
+        /// <summary>
+        /// Render Result Value
+        /// </summary>
+        /// <param name="logEvent">Log event for rendering</param>
+        /// <returns>Result value when available, else fallback to defaultValue</returns>
+        public object RenderValue(LogEventInfo logEvent) => _layoutInfo.RenderValue(logEvent);
     }
 }

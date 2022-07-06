@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,6 +34,8 @@
 namespace NLog.Conditions
 {
     using Layouts;
+    using NLog.Internal;
+    using System.Text;
 
     /// <summary>
     /// Condition layout expression (represented by a string literal
@@ -41,20 +43,23 @@ namespace NLog.Conditions
     /// </summary>
     internal sealed class ConditionLayoutExpression : ConditionExpression
     {
+        private readonly SimpleLayout _simpleLayout;
+        private StringBuilder _fastObjectPool;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ConditionLayoutExpression" /> class.
         /// </summary>
         /// <param name="layout">The layout.</param>
-        public ConditionLayoutExpression(Layout layout)
+        public ConditionLayoutExpression(SimpleLayout layout)
         {
-            Layout = layout;
+            _simpleLayout = layout;
         }
 
         /// <summary>
         /// Gets the layout.
         /// </summary>
         /// <value>The layout.</value>
-        public Layout Layout { get; private set; }
+        public Layout Layout => _simpleLayout;
 
         /// <summary>
         /// Returns a string representation of this expression.
@@ -62,23 +67,31 @@ namespace NLog.Conditions
         /// <returns>String literal in single quotes.</returns>
         public override string ToString()
         {
-            if (Layout is SimpleLayout simpleLayout)
-            {
-                return "'" + simpleLayout.ToString() + "'";
-            }
-
-            return Layout.ToString();
+            return $"'{_simpleLayout.ToString()}'";
         }
 
         /// <summary>
-        /// Evaluates the expression by calculating the value
-        /// of the layout in the specified evaluation context.
+        /// Evaluates the expression by rendering the formatted output from
+        /// the <see cref="Layout"/>
         /// </summary>
         /// <param name="context">Evaluation context.</param>
-        /// <returns>The value of the layout.</returns>
+        /// <returns>The output rendered from the layout.</returns>
         protected override object EvaluateNode(LogEventInfo context)
         {
-            return Layout.Render(context);
+            if (_simpleLayout.IsSimpleStringText || !_simpleLayout.ThreadAgnostic)
+                return _simpleLayout.Render(context);
+
+            var stringBuilder = System.Threading.Interlocked.Exchange(ref _fastObjectPool, null) ?? new StringBuilder();
+            try
+            {
+                _simpleLayout.Render(context, stringBuilder);
+                return stringBuilder.ToString();
+            }
+            finally
+            {
+                stringBuilder.ClearBuilder();
+                System.Threading.Interlocked.Exchange(ref _fastObjectPool, stringBuilder);
+            }
         }
     }
 }

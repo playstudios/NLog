@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
 
 namespace NLog.LayoutRenderers
 {
@@ -42,6 +42,7 @@ namespace NLog.LayoutRenderers
     using System.Text;
     using NLog.Common;
     using NLog.Config;
+    using NLog.Internal;
 
     /// <summary>
     /// The IP address from the network interface card (NIC) on the local machine
@@ -51,7 +52,6 @@ namespace NLog.LayoutRenderers
     /// </remarks>
     [LayoutRenderer("local-ip")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class LocalIpAddressLayoutRenderer : LayoutRenderer
     {
         private AddressFamily? _addressFamily;
@@ -60,16 +60,16 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Get or set whether to prioritize IPv6 or IPv4 (default)
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public AddressFamily AddressFamily { get => _addressFamily ?? AddressFamily.InterNetwork; set => _addressFamily = value; }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         public LocalIpAddressLayoutRenderer()
         {
             _networkInterfaceRetriever = new NetworkInterfaceRetriever();
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         internal LocalIpAddressLayoutRenderer(INetworkInterfaceRetriever networkInterfaceRetriever)
         {
             _networkInterfaceRetriever = networkInterfaceRetriever;
@@ -163,12 +163,6 @@ namespace NLog.LayoutRenderers
             if (currentScore == 0)
                 return 0;
 
-            if (!networkAddress.IsDnsEligible)
-                currentScore += 1;
-
-            if (networkAddress.PrefixOrigin == PrefixOrigin.Dhcp)
-                currentScore += 1;
-
             var gatewayAddresses = ipProperties.GatewayAddresses;
             if (gatewayAddresses?.Count > 0)
             {
@@ -177,6 +171,19 @@ namespace NLog.LayoutRenderers
                     if (!IsLoopbackAddressValue(gateway.Address))
                     {
                         currentScore += 3;
+                        break;
+                    }
+                }
+            }
+
+            var dnsAddresses = ipProperties.DnsAddresses;
+            if (dnsAddresses?.Count > 0)
+            {
+                foreach (var dns in dnsAddresses)
+                {
+                    if (!IsLoopbackAddressValue(dns))
+                    {
+                        currentScore += 1;
                         break;
                     }
                 }
@@ -215,7 +222,7 @@ namespace NLog.LayoutRenderers
 
         private static bool IsLoopbackAddressValue(IPAddress ipAddress)
         {
-            if (ipAddress == null)
+            if (ipAddress is null)
                 return true;
 
             if (IPAddress.IsLoopback(ipAddress))

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -50,12 +50,12 @@ namespace NLog.Config
         where TAttributeType : NameBaseAttribute
     {
         private readonly Dictionary<string, GetTypeDelegate> _items = new Dictionary<string, GetTypeDelegate>(StringComparer.OrdinalIgnoreCase);
-        private readonly ServiceRepository _serviceRepository;
+        private readonly ConfigurationItemFactory _parentFactory;
         private readonly Factory<TBaseType, TAttributeType> _globalDefaultFactory;
 
-        internal Factory(ServiceRepository serviceRepository, Factory<TBaseType, TAttributeType> globalDefaultFactory)
+        internal Factory(ConfigurationItemFactory parentFactory, Factory<TBaseType, TAttributeType> globalDefaultFactory)
         {
-            _serviceRepository = serviceRepository;
+            _parentFactory = parentFactory;
             _globalDefaultFactory = globalDefaultFactory;
         }
 
@@ -65,14 +65,15 @@ namespace NLog.Config
         /// Scans the assembly.
         /// </summary>
         /// <param name="types">The types to scan.</param>
-        /// <param name="prefix">The prefix.</param>
-        public void ScanTypes(Type[] types, string prefix)
+        /// <param name="assemblyName">The assembly name for the types.</param>
+        /// <param name="itemNamePrefix">The prefix.</param>
+        public void ScanTypes(Type[] types, string assemblyName, string itemNamePrefix)
         {
             foreach (Type t in types)
             {
                 try
                 {
-                    RegisterType(t, prefix);
+                    RegisterType(t, assemblyName, itemNamePrefix);
                 }
                 catch (Exception exception)
                 {
@@ -93,6 +94,17 @@ namespace NLog.Config
         /// <param name="itemNamePrefix">The item name prefix.</param>
         public void RegisterType(Type type, string itemNamePrefix)
         {
+            RegisterType(type, string.Empty, itemNamePrefix);
+        }
+
+        /// <summary>
+        /// Registers the type.
+        /// </summary>
+        /// <param name="type">The type to register.</param>
+        /// <param name="assemblyName">The assembly name for the type.</param>
+        /// <param name="itemNamePrefix">The item name prefix.</param>
+        public void RegisterType(Type type, string assemblyName, string itemNamePrefix)
+        {
             if (typeof(TBaseType).IsAssignableFrom(type))
             {
                 IEnumerable<TAttributeType> attributes = type.GetCustomAttributes<TAttributeType>(false);
@@ -100,7 +112,7 @@ namespace NLog.Config
                 {
                     foreach (var attr in attributes)
                     {
-                        RegisterDefinition(itemNamePrefix + attr.Name, type);
+                        RegisterDefinition(attr.Name, type, assemblyName, itemNamePrefix);
                     }
                 }
             }
@@ -113,6 +125,7 @@ namespace NLog.Config
         /// <param name="typeName">Name of the type.</param>
         public void RegisterNamedType(string itemName, string typeName)
         {
+            itemName = NormalizeName(itemName);
             _items[itemName] = () => Type.GetType(typeName, false);
         }
 
@@ -131,7 +144,27 @@ namespace NLog.Config
         /// <param name="itemDefinition">The type of the item.</param>
         public void RegisterDefinition(string itemName, Type itemDefinition)
         {
-            _items[itemName] = () => itemDefinition;
+            RegisterDefinition(itemName, itemDefinition, string.Empty, string.Empty);
+        }
+
+        /// <summary>
+        /// Registers a single type definition.
+        /// </summary>
+        /// <param name="itemName">The item name.</param>
+        /// <param name="itemDefinition">The type of the item.</param>
+        /// <param name="assemblyName">The assembly name for the types.</param>
+        /// <param name="itemNamePrefix">The item name prefix.</param>
+        private void RegisterDefinition(string itemName, Type itemDefinition, string assemblyName, string itemNamePrefix)
+        {
+            GetTypeDelegate typeLookup = () => itemDefinition;
+            itemName = NormalizeName(itemName);
+            _items[itemNamePrefix + itemName] = typeLookup;
+            if (!string.IsNullOrEmpty(assemblyName))
+            {
+                _items[itemName + ", " + assemblyName] = typeLookup;
+                _items[itemDefinition.Name + ", " + assemblyName] = typeLookup;
+                _items[itemDefinition.ToString() + ", " + assemblyName] = typeLookup;
+            }
         }
 
         /// <summary>
@@ -144,6 +177,7 @@ namespace NLog.Config
         {
             GetTypeDelegate getTypeDelegate;
 
+            itemName = NormalizeName(itemName);
             if (!_items.TryGetValue(itemName, out getTypeDelegate))
             {
                 if (_globalDefaultFactory != null && _globalDefaultFactory.TryGetDefinition(itemName, out result))
@@ -181,13 +215,14 @@ namespace NLog.Config
         /// <returns>True if instance was created successfully, false otherwise.</returns>
         public virtual bool TryCreateInstance(string itemName, out TBaseType result)
         {
+            itemName = NormalizeName(itemName);
             if (!TryGetDefinition(itemName, out var itemType))
             {
                 result = null;
                 return false;
             }
 
-            result = (TBaseType)_serviceRepository.ConfigurationItemCreator(itemType);
+            result = (TBaseType)_parentFactory.CreateInstance(itemType);
             return true;
         }
 
@@ -198,32 +233,78 @@ namespace NLog.Config
         /// <returns>Created item.</returns>
         public virtual TBaseType CreateInstance(string itemName)
         {
-            if (TryCreateInstance(itemName, out TBaseType result))
+            var normalName = NormalizeName(itemName);
+            if (TryCreateInstance(normalName, out TBaseType result))
             {
                 return result;
             }
 
-            var message = typeof(TBaseType).Name + " cannot be found: '" + itemName + "'";
-            if (itemName != null && (itemName.StartsWith("aspnet", StringComparison.OrdinalIgnoreCase) ||
-                                 itemName.StartsWith("iis", StringComparison.OrdinalIgnoreCase)))
+            var message = typeof(TBaseType).Name + " type-alias is unknown: '" + itemName + "'";
+            if (normalName != null && (normalName.StartsWith("aspnet", StringComparison.OrdinalIgnoreCase) ||
+                                 normalName.StartsWith("iis", StringComparison.OrdinalIgnoreCase)))
             {
-                //common mistake and probably missing NLog.Web
-                message += ". Is NLog.Web not included?";
+#if NETSTANDARD
+                message += ". Extension NLog.Web.AspNetCore not included?";
+#else
+                message += ". Extension NLog.Web not included?";
+#endif
+            }
+            else if (normalName?.StartsWith("database", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                message += ". Extension NLog.Database not included?";
+            }
+            else if (normalName?.StartsWith("windowsidentity", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                message += ". Extension NLog.WindowsIdentity not included?";
+            }
+            else if (normalName?.StartsWith("outputdebugstring", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                message += ". Extension NLog.OutputDebugString not included?";
+            }
+            else if (normalName?.StartsWith("performancecounter", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                message += ". Extension NLog.PerformanceCounter not included?";
             }
 
             throw new ArgumentException(message);
+        }
+
+        protected static string NormalizeName(string itemName)
+        {
+            if (itemName == null)
+            {
+                return string.Empty;
+            }
+
+            var delimitIndex = itemName.IndexOf('-');
+            if (delimitIndex < 0)
+            {
+                return itemName;
+            }
+
+            // Only for the first comma
+            var commaIndex = itemName.IndexOf(',');
+            if (commaIndex >= 0)
+            {
+                var left = itemName.Substring(0, commaIndex).Replace("-", string.Empty);
+                var right = itemName.Substring(commaIndex);
+                return left + right;
+            }
+
+            return itemName.Replace("-", string.Empty);
         }
     }
 
     /// <summary>
     /// Factory specialized for <see cref="LayoutRenderer"/>s. 
     /// </summary>
-    class LayoutRendererFactory : Factory<LayoutRenderer, LayoutRendererAttribute>
+    internal class LayoutRendererFactory : Factory<LayoutRenderer, LayoutRendererAttribute>
     {
         private Dictionary<string, FuncLayoutRenderer> _funcRenderers;
         private readonly LayoutRendererFactory _globalDefaultFactory;
 
-        public LayoutRendererFactory(ServiceRepository serviceRepository, LayoutRendererFactory globalDefaultFactory) : base(serviceRepository, globalDefaultFactory)
+        public LayoutRendererFactory(ConfigurationItemFactory parentFactory, LayoutRendererFactory globalDefaultFactory)
+            : base(parentFactory, globalDefaultFactory)
         {
             _globalDefaultFactory = globalDefaultFactory;
         }
@@ -239,14 +320,15 @@ namespace NLog.Config
         /// <summary>
         /// Register a layout renderer with a callback function.
         /// </summary>
-        /// <param name="name">Name of the layoutrenderer, without ${}.</param>
+        /// <param name="itemName">Name of the layoutrenderer, without ${}.</param>
         /// <param name="renderer">the renderer that renders the value.</param>
-        public void RegisterFuncLayout(string name, FuncLayoutRenderer renderer)
+        public void RegisterFuncLayout(string itemName, FuncLayoutRenderer renderer)
         {
+            itemName = NormalizeName(itemName);
             _funcRenderers = _funcRenderers ?? new Dictionary<string, FuncLayoutRenderer>(StringComparer.OrdinalIgnoreCase);
 
             //overwrite current if there is one
-            _funcRenderers[name] = renderer;
+            _funcRenderers[itemName] = renderer;
         }
 
         /// <summary>
@@ -259,6 +341,7 @@ namespace NLog.Config
         {
             //first try func renderers, as they should have the possibility to overwrite a current one.
             FuncLayoutRenderer funcResult;
+            itemName = NormalizeName(itemName);
             if (_funcRenderers != null)
             {
                 var successAsFunc = _funcRenderers.TryGetValue(itemName, out funcResult);

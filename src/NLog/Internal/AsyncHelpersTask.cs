@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,10 +34,10 @@
 
 namespace NLog.Internal
 {
-#if NETSTANDARD1_0
-    using AsyncDelegate = System.Action<object>;
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
     using AsyncDelegate = System.Threading.WaitCallback;
+#else
+    using AsyncDelegate = System.Action<object>;
 #endif
 
     /// <summary>

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -59,11 +59,11 @@ namespace NLog.Config
         /// <summary>
         /// Gets the .NET type of the array item.
         /// </summary>
-        public Type ItemType { get; private set; }
+        public Type ItemType { get; }
 
         /// <summary>
         /// Gets the XML element name.
         /// </summary>
-        public string ElementName { get; private set; }
+        public string ElementName { get; }
     }
 }

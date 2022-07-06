@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,25 +33,39 @@
 
 namespace NLog.Targets
 {
-    using System.ComponentModel;
-    using Config;
-    using Layouts;
+    using NLog.Config;
+    using NLog.Layouts;
 
     /// <summary>
     /// Represents target that supports string formatting using layouts.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/NLog/NLog/wiki/How-to-write-a-custom-target">See NLog Wiki</a>
+    /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/How-to-write-a-custom-target">Documentation on NLog Wiki</seealso>
     public abstract class TargetWithLayout : Target
     {
+        private const string DefaultLayoutText = "${longdate}|${level:uppercase=true}|${logger}|${message:withexception=true}";
+        private static NLog.LayoutRenderers.LayoutRenderer[] DefaultLayout => new NLog.LayoutRenderers.LayoutRenderer[]
+        {
+            new NLog.LayoutRenderers.LongDateLayoutRenderer(),
+            new NLog.LayoutRenderers.LiteralLayoutRenderer("|"),
+            new NLog.LayoutRenderers.LevelLayoutRenderer() { Uppercase = true },
+            new NLog.LayoutRenderers.LiteralLayoutRenderer("|"),
+            new NLog.LayoutRenderers.LoggerNameLayoutRenderer(),
+            new NLog.LayoutRenderers.LiteralLayoutRenderer("|"),
+            new NLog.LayoutRenderers.MessageLayoutRenderer() { WithException = true },
+        };
+
         /// <summary>
         /// Initializes a new instance of the <see cref="TargetWithLayout" /> class.
         /// </summary>
         /// <remarks>
         /// The default value of the layout is: <code>${longdate}|${level:uppercase=true}|${logger}|${message:withexception=true}</code>
         /// </remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2214:DoNotCallOverridableMethodsInConstructors", Justification = "This one is safe.")]
         protected TargetWithLayout()
         {
-            Layout = "${longdate}|${level:uppercase=true}|${logger}|${message:withexception=true}";
+            Layout = new SimpleLayout(DefaultLayout, DefaultLayoutText, ConfigurationItemFactory.Default);
         }
 
         /// <summary>
@@ -62,7 +76,6 @@ namespace NLog.Targets
         /// </remarks>
         /// <docgen category='Layout Options' order='1' />
         [RequiredParameter]
-        [DefaultValue("${longdate}|${level:uppercase=true}|${logger}|${message:withexception=true}")]
         public virtual Layout Layout { get; set; }
    }
 }

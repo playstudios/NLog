@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -40,9 +40,7 @@ namespace NLog.UnitTests.LayoutRenderers
     using System.Reflection;
     using System.Threading;
     using System.Xml;
-    using NLog.Config;
     using NLog.Internal;
-    using NLog.LayoutRenderers;
     using NLog.Layouts;
     using NLog.Targets;
     using Xunit;
@@ -52,7 +50,7 @@ namespace NLog.UnitTests.LayoutRenderers
         [Fact]
         public void Log4JXmlTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
             <nlog throwExceptions='true'>
                 <targets>
                     <target name='debug' type='Debug' layout='${log4jxmlevent:includeCallSite=true:includeSourceInfo=true:includeNdlc=true:includeMdc=true:IncludeNdc=true:includeMdlc=true:IncludeAllProperties=true:ndcItemSeparator=\:\::includenlogdata=true:loggerName=${logger}}' />
@@ -60,29 +58,23 @@ namespace NLog.UnitTests.LayoutRenderers
                 <rules>
                     <logger name='*' minlevel='Debug' writeTo='debug' />
                 </rules>
-            </nlog>");
+            </nlog>").LogFactory;
 
-            MappedDiagnosticsContext.Clear();
-            NestedDiagnosticsContext.Clear();
+            ScopeContext.Clear();
 
-            MappedDiagnosticsContext.Set("foo1", "bar1");
-            MappedDiagnosticsContext.Set("foo2", "bar2");
+            ScopeContext.PushProperty("foo1", "bar1");
+            ScopeContext.PushProperty("foo2", "bar2");
+            ScopeContext.PushProperty("foo3", "bar3");
 
-            MappedDiagnosticsLogicalContext.Clear();
-            MappedDiagnosticsLogicalContext.Set("foo3", "bar3");
+            ScopeContext.PushNestedState("baz1");
+            ScopeContext.PushNestedState("baz2");
+            ScopeContext.PushNestedState("baz3");
 
-            NestedDiagnosticsLogicalContext.Push("boo1");
-            NestedDiagnosticsLogicalContext.Push("boo2");
-
-            NestedDiagnosticsContext.Push("baz1");
-            NestedDiagnosticsContext.Push("baz2");
-            NestedDiagnosticsContext.Push("baz3");
-
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = logFactory.GetLogger("A");
             var logEventInfo = LogEventInfo.Create(LogLevel.Debug, "A", new Exception("Hello Exception", new Exception("Goodbye Exception")), null, "some message");
             logEventInfo.Properties["nlogPropertyKey"] = "nlogPropertyValue";
             logger.Log(logEventInfo);
-            string result = GetDebugLastMessage("debug");
+            string result = GetDebugLastMessage("debug", logFactory);
             string wrappedResult = "<log4j:dummyRoot xmlns:log4j='http://log4j' xmlns:nlog='http://nlog'>" + result + "</log4j:dummyRoot>";
 
             Assert.NotEqual("", result);
@@ -145,7 +137,7 @@ namespace NLog.UnitTests.LayoutRenderers
 
                             case "NDC":
                                 reader.Read();
-                                Assert.Equal("baz1::baz2::baz3::boo1 boo2", reader.Value);
+                                Assert.Equal("baz1::baz2::baz3", reader.Value);
                                 break;
 
                             case "locationInfo":
@@ -238,7 +230,7 @@ namespace NLog.UnitTests.LayoutRenderers
         }
 
         [Fact]
-        void Log4JXmlEventLayoutParameterTest()
+        public void Log4JXmlEventLayoutParameterTest()
         {
             var log4jLayout = new Log4JXmlEventLayout()
             {
@@ -257,17 +249,17 @@ namespace NLog.UnitTests.LayoutRenderers
                 LoggerName = "MyLOgger",
                 TimeStamp = new DateTime(2010, 01, 01, 12, 34, 56, DateTimeKind.Utc),
                 Level = LogLevel.Info,
-                Message = "hello, {0}",
+                Message = "hello, <{0}>",
                 Parameters = new[] { "world" },
             };
 
             var threadid = Environment.CurrentManagedThreadId;
             var machinename = Environment.MachineName;
-            Assert.Equal($"<log4j:event logger=\"MyLOgger\" level=\"INFO\" timestamp=\"1262349296000\" thread=\"{threadid}\"><log4j:message>hello, world</log4j:message><log4j:properties><log4j:data name=\"mt\" value=\"hello, {{0}}\" /><log4j:data name=\"log4japp\" value=\"MyApp\" /><log4j:data name=\"log4jmachinename\" value=\"{machinename}\" /></log4j:properties></log4j:event>", log4jLayout.Render(logEventInfo));
+            Assert.Equal($"<log4j:event logger=\"MyLOgger\" level=\"INFO\" timestamp=\"1262349296000\" thread=\"{threadid}\"><log4j:message>hello, &lt;world&gt;</log4j:message><log4j:properties><log4j:data name=\"mt\" value=\"hello, &lt;{{0}}&gt;\" /><log4j:data name=\"log4japp\" value=\"MyApp\" /><log4j:data name=\"log4jmachinename\" value=\"{machinename}\" /></log4j:properties></log4j:event>", log4jLayout.Render(logEventInfo));
         }
 
         [Fact]
-        void BadXmlValueTest()
+        public void BadXmlValueTest()
         {
             var sb = new System.Text.StringBuilder();
 
@@ -333,110 +325,6 @@ namespace NLog.UnitTests.LayoutRenderers
             Assert.NotEqual(badString.Length, goodString.Length);
             Assert.Contains("abc", badString);
             Assert.Contains("abc", goodString);
-        }
-
-        [Fact]
-        public void NestedDiagnosticContextInformation_is_stored_in_the_same_sort_order_as_used_by_the_nested_diagnostic_layout_renderer()
-        {
-            var ndcSeparator = "::";
-            var ndlcSeparator = " ";
-            ConfigureLogManager(ndcSeparator, ndlcSeparator);
-
-            // Act
-            NestedDiagnosticsContext.Clear();
-            NestedDiagnosticsLogicalContext.Push("foo");
-            NestedDiagnosticsLogicalContext.Push("bar");
-
-            NestedDiagnosticsLogicalContext.Clear();
-            NestedDiagnosticsContext.Push("baz1");
-            NestedDiagnosticsContext.Push("baz2");
-            NestedDiagnosticsContext.Push("baz3");
-
-            var logEvent = Log("A", LogLevel.Debug, null, null, "some message");
-
-            // Assert
-            var expected = GetExpectedNdcValue(logEvent, ndcSeparator, ndlcSeparator);
-            var actual = GetXmlDocument().GetElementsByTagName("log4j:NDC")[0].InnerText;
-
-            Assert.Equal(expected, actual);
-        }
-        
-        [Fact]
-        public void If_Ndc_And_Ndlc_is_present_they_are_combined_with_a_NdcSeparator()
-        {
-            // Arrange
-            var ndcSeparator = "::";
-            var ndlcSeparator = " ";
-            ConfigureLogManager(ndcSeparator, ndlcSeparator);
-
-            // Act
-            NestedDiagnosticsContext.Clear();
-            NestedDiagnosticsContext.Push("foo");
-
-            NestedDiagnosticsLogicalContext.Clear();
-            NestedDiagnosticsLogicalContext.Push("bar");
-
-            var logEvent = Log("A", LogLevel.Debug, null, null, "some message");
-
-            // Assert
-            var expected = GetExpectedNdcValue(logEvent, ndcSeparator, ndlcSeparator);
-            var actual = GetXmlDocument().GetElementsByTagName("log4j:NDC")[0].InnerText;
-
-            Assert.Equal(expected, actual);
-        }
-
-        private void ConfigureLogManager(string ndcSeparator, string ndlcSeparator)
-        {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
-            <nlog throwExceptions='true'>
-                <targets>
-                    <target name='debug' 
-                        type='Debug' 
-                        layout='${log4jxmlevent" + 
-                            ":includeCallSite=true" +
-                            ":includeSourceInfo=true" +
-                            ":includeNdlc=true" +
-                            ":includeMdc=true" +
-                            ":IncludeNdc=true" +
-                            ":includeMdlc=true" +
-                            ":IncludeAllProperties=true" +
-                            $":ndcItemSeparator={ndcSeparator.Replace(":", "\\:")}" + 
-                            $":ndlcItemSeparator={ndlcSeparator.Replace(":", "\\:")}" + 
-                            ":includenlogdata=true" +
-                            ":loggerName=${logger}" +
-                        @"}' />
-                </targets>
-                <rules>
-                    <logger name='*' minlevel='Debug' writeTo='debug' />
-                </rules>
-            </nlog>");
-        }
-        
-        private LogEventInfo Log(string loggerName, LogLevel level, Exception exception, IFormatProvider formatProvider, string message)
-        {
-            ILogger logger = LogManager.GetLogger(loggerName);
-            var logEventInfo = LogEventInfo.Create(level, logger.Name, exception, formatProvider, message);
-            logger.Log(logEventInfo);
-
-            return logEventInfo;
-        }
-
-        private XmlDocument GetXmlDocument()
-        {
-            var result = GetDebugLastMessage("debug");
-            result = $"<log4j:dummyRoot xmlns:log4j='http://log4j' xmlns:nlog='http://nlog'>{result}</log4j:dummyRoot>";
-            var doc = new XmlDocument();
-            doc.LoadXml(result);
-
-            return doc;
-        }
-
-        private string GetExpectedNdcValue(LogEventInfo logEvent, string ndcSeparator, string ndlcSeparator)
-        {
-            var ndcLayoutRenderer = new NdcLayoutRenderer { Separator = ndcSeparator };
-            var ndlcLayoutRenderer = new NdlcLayoutRenderer { Separator = ndlcSeparator};
-
-            return $"{ndcLayoutRenderer.Render(logEvent)}{ndcSeparator}{ndlcLayoutRenderer.Render(logEvent)}";
         }
     }
 }

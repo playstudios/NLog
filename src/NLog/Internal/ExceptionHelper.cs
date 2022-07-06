@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -77,10 +77,10 @@ namespace NLog.Internal
         /// Advised to log first the error to the <see cref="InternalLogger"/> before calling this method.
         /// </summary>
         /// <param name="exception">The exception to check.</param>
-        /// <param name="loggerContext">Target context of the exception.</param>
-
+        /// <param name="loggerContext">Target Object context of the exception.</param>
+        /// <param name="callerMemberName">Target Method context of the exception.</param>
         /// <returns><c>true</c>if the <paramref name="exception"/> must be rethrown, <c>false</c> otherwise.</returns>
-        public static bool MustBeRethrown(this Exception exception, IInternalLoggerContext loggerContext = null)
+        public static bool MustBeRethrown(this Exception exception, IInternalLoggerContext loggerContext = null, string callerMemberName = null)
         {
             if (exception.MustBeRethrownImmediately())
             {
@@ -95,15 +95,17 @@ namespace NLog.Internal
             {
                 var level = isConfigError ? LogLevel.Warn : LogLevel.Error;
                 if (loggerContext != null)
-                    InternalLogger.Log(exception, level, "{0}: Error has been raised.", loggerContext);
+                {
+                    if (string.IsNullOrEmpty(callerMemberName))
+                        InternalLogger.Log(exception, level, "{0}: Error has been raised.", loggerContext);
+                    else
+                        InternalLogger.Log(exception, level, "{0}: Exception in {1}", loggerContext, callerMemberName);
+                }
                 else
                     InternalLogger.Log(exception, level, "Error has been raised.");
             }
 
             var logFactory = loggerContext?.LogFactory;
-
-            //if ThrowConfigExceptions is null, use ThrowExceptions
-            // TODO NLog 5: use only LogManager if logFactory is null
             var throwExceptionsAll = logFactory?.ThrowExceptions == true || LogManager.ThrowExceptions;
             var shallRethrow = isConfigError ? (logFactory?.ThrowConfigExceptions ?? LogManager.ThrowConfigExceptions ?? throwExceptionsAll) : throwExceptionsAll;
             return shallRethrow;
@@ -118,15 +120,15 @@ namespace NLog.Internal
         /// <returns><c>true</c>if the <paramref name="exception"/> must be rethrown, <c>false</c> otherwise.</returns>
         public static bool MustBeRethrownImmediately(this Exception exception)
         {
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             if (exception is StackOverflowException)
             {
-                return true;
+                return true; // StackOverflowException cannot be caught since .NetFramework 2.0
             }
 
             if (exception is ThreadAbortException)
             {
-                return true;
+                return true; // ThreadAbortException will automatically be rethrown at end of catch-block
             }
 #endif
 

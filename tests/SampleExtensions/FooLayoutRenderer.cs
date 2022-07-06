@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,9 +41,9 @@ namespace MyExtensionNamespace
     [LayoutRenderer("foo")]
     public class FooLayoutRenderer : LayoutRenderer
     {
-        protected override void Append(StringBuilder buffer, LogEventInfo logEvent)
+        protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
-            buffer.Append("foo");
+            builder.Append("foo");
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -49,7 +49,7 @@ namespace NLog.LayoutRenderers
         File,
 
         /// <summary>
-        /// Gets additional version information.
+        /// Gets the product version, extracted from the additional version information.
         /// </summary>
         Informational
     }

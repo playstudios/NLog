@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -47,7 +47,7 @@ namespace NLog.Filters
         /// </summary>
         public WhenMethodFilter(Func<LogEventInfo, FilterResult> filterMethod)
         {
-            if (filterMethod == null)
+            if (filterMethod is null)
                 throw new ArgumentNullException(nameof(filterMethod));
             _filterMethod = filterMethod;
         }
@@ -55,7 +55,13 @@ namespace NLog.Filters
         /// <inheritdoc/>
         protected override FilterResult Check(LogEventInfo logEvent)
         {
-            return _filterMethod(logEvent);
+            var result = _filterMethod(logEvent);
+            if (Action == FilterResult.Neutral)
+                return result;
+            else if (result != FilterResult.Neutral)
+                return Action;
+            else
+                return FilterResult.Neutral;
         }
     }
 }

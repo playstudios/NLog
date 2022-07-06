@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -71,7 +71,7 @@ namespace NLog
         /// <param name="arg2">Second argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, object arg1, object arg2);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, object arg1, object arg2);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified parameters.
@@ -83,7 +83,7 @@ namespace NLog
         /// <param name="arg3">Third argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, object arg1, object arg2, object arg3);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, object arg1, object arg2, object arg3);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -94,7 +94,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, bool argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, bool argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -104,7 +104,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, bool argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, bool argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -115,7 +115,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, char argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, char argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -125,7 +125,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, char argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, char argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -136,7 +136,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, byte argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, byte argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -146,7 +146,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, byte argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, byte argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -157,7 +157,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, string argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, string argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -167,7 +167,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, string argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, string argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -178,7 +178,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, int argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, int argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -188,7 +188,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, int argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, int argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -199,7 +199,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, long argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, long argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -209,7 +209,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, long argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, long argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -220,7 +220,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, float argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, float argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -230,7 +230,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, float argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, float argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -241,7 +241,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, double argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, double argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -251,7 +251,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, double argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, double argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -262,7 +262,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, decimal argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, decimal argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -272,7 +272,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, decimal argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, decimal argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -283,7 +283,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, object argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, object argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -293,7 +293,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, object argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, object argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -304,7 +304,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, sbyte argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, sbyte argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -314,7 +314,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>    
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, sbyte argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, sbyte argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -325,7 +325,7 @@ namespace NLog
         /// <param name="argument">The argument to format.</param>        
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, uint argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, uint argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -336,7 +336,7 @@ namespace NLog
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, uint argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, uint argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter and formatting it with the supplied format provider.
@@ -348,7 +348,7 @@ namespace NLog
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, IFormatProvider formatProvider, string message, ulong argument);
+        void Log(LogLevel level, IFormatProvider formatProvider, [Localizable(false)][StructuredMessageTemplate] string message, ulong argument);
 
         /// <summary>
         /// Writes the diagnostic message at the specified level using the specified value as a parameter.
@@ -359,7 +359,7 @@ namespace NLog
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         [MessageTemplateFormatMethod("message")]
-        void Log(LogLevel level, string message, ulong argument);
+        void Log(LogLevel level, [Localizable(false)][StructuredMessageTemplate] string message, ulong argument);
 
         #endregion
     }

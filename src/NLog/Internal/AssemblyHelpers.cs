@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -52,7 +52,7 @@ namespace NLog.Internal
         /// <returns></returns>
         public static Assembly LoadFromPath(string assemblyFileName, string baseDirectory = null)
         {
-            string fullFileName = baseDirectory == null ? assemblyFileName : Path.Combine(baseDirectory, assemblyFileName);
+            string fullFileName = baseDirectory is null ? assemblyFileName : Path.Combine(baseDirectory, assemblyFileName);
 
             InternalLogger.Info("Loading assembly file: {0}", fullFileName);
 #if NETSTANDARD1_5
@@ -83,10 +83,7 @@ namespace NLog.Internal
         {
             InternalLogger.Info("Loading assembly: {0}", assemblyName);
 
-#if NETSTANDARD1_0
-            var name = new AssemblyName(assemblyName);
-            return Assembly.Load(name);
-#else
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
             try
             {
                 Assembly assembly = Assembly.Load(assemblyName);
@@ -106,6 +103,9 @@ namespace NLog.Internal
                 InternalLogger.Trace("Haven't found' '{0}' in current domain", assemblyName);
                 throw;
             }
+#else
+            var name = new AssemblyName(assemblyName);
+            return Assembly.Load(name);
 #endif
         }
 
@@ -120,29 +120,29 @@ namespace NLog.Internal
                 return false;
 #endif
             var expectedKeyToken = expected.GetPublicKeyToken();
-            var correctToken = expectedKeyToken == null || expectedKeyToken.SequenceEqual(actual.GetPublicKeyToken());
+            var correctToken = expectedKeyToken is null || expectedKeyToken.SequenceEqual(actual.GetPublicKeyToken());
             return correctToken;
         }
 
 #if !NETSTANDARD1_3
         public static string GetAssemblyFileLocation(Assembly assembly)
         {
-            string fullName = string.Empty;
+            string assemblyFullName = string.Empty;
 
             try
             {
-                if (assembly == null)
+                if (assembly is null)
                 {
                     return string.Empty;
                 }
 
-                fullName = assembly.FullName;
+                assemblyFullName = assembly.FullName;
 
 #if NETSTANDARD
                 if (string.IsNullOrEmpty(assembly.Location))
                 {
                     // Assembly with no actual location should be skipped (Avoid PlatformNotSupportedException)
-                    InternalLogger.Warn("Ignoring assembly location because location is empty: {0}", fullName);
+                    InternalLogger.Debug("Ignoring assembly location because location is empty: {0}", assemblyFullName);
                     return string.Empty;
                 }
 #endif
@@ -150,30 +150,30 @@ namespace NLog.Internal
                 Uri assemblyCodeBase;
                 if (!Uri.TryCreate(assembly.CodeBase, UriKind.RelativeOrAbsolute, out assemblyCodeBase))
                 {
-                    InternalLogger.Warn("Ignoring assembly location because code base is unknown: '{0}' ({1})", assembly.CodeBase, fullName);
+                    InternalLogger.Debug("Ignoring assembly location because code base is unknown: '{0}' ({1})", assembly.CodeBase, assemblyFullName);
                     return string.Empty;
                 }
 
                 var assemblyLocation = Path.GetDirectoryName(assemblyCodeBase.LocalPath);
                 if (string.IsNullOrEmpty(assemblyLocation))
                 {
-                    InternalLogger.Warn("Ignoring assembly location because it is not a valid directory: '{0}' ({1})", assemblyCodeBase.LocalPath, fullName);
+                    InternalLogger.Debug("Ignoring assembly location because it is not a valid directory: '{0}' ({1})", assemblyCodeBase.LocalPath, assemblyFullName);
                     return string.Empty;
                 }
 
                 DirectoryInfo directoryInfo = new DirectoryInfo(assemblyLocation);
                 if (!directoryInfo.Exists)
                 {
-                    InternalLogger.Warn("Ignoring assembly location because directory doesn't exists: '{0}' ({1})", assemblyLocation, fullName);
+                    InternalLogger.Debug("Ignoring assembly location because directory doesn't exists: '{0}' ({1})", assemblyLocation, assemblyFullName);
                     return string.Empty;
                 }
 
-                InternalLogger.Debug("Found assembly location directory: '{0}' ({1})", directoryInfo.FullName, fullName);
+                InternalLogger.Debug("Found assembly location directory: '{0}' ({1})", directoryInfo.FullName, assemblyFullName);
                 return directoryInfo.FullName;
             }
             catch (System.PlatformNotSupportedException ex)
             {
-                InternalLogger.Warn(ex, "Ignoring assembly location because assembly lookup is not supported: {0}", fullName);
+                InternalLogger.Warn(ex, "Ignoring assembly location because assembly lookup is not supported: {0}", assemblyFullName);
                 if (ex.MustBeRethrown())
                 {
                     throw;
@@ -182,7 +182,7 @@ namespace NLog.Internal
             }
             catch (System.Security.SecurityException ex)
             {
-                InternalLogger.Warn(ex, "Ignoring assembly location because assembly lookup is not allowed: {0}", fullName);
+                InternalLogger.Warn(ex, "Ignoring assembly location because assembly lookup is not allowed: {0}", assemblyFullName);
                 if (ex.MustBeRethrown())
                 {
                     throw;
@@ -191,7 +191,7 @@ namespace NLog.Internal
             }
             catch (UnauthorizedAccessException ex)
             {
-                InternalLogger.Warn(ex, "Ignoring assembly location because assembly lookup is not allowed: {0}", fullName);
+                InternalLogger.Warn(ex, "Ignoring assembly location because assembly lookup is not allowed: {0}", assemblyFullName);
                 if (ex.MustBeRethrown())
                 {
                     throw;

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers.Wrappers
 {
     using System;
-    using System.ComponentModel;
     using NLog.Config;
     using NLog.Internal;
     using NLog.Layouts;
@@ -66,43 +65,34 @@ namespace NLog.LayoutRenderers.Wrappers
             OnClose = 2
         }
 
+        private readonly object _lockObject = new object();
         private string _cachedValue;
         private string _renderedCacheKey;
         private DateTime _cachedValueExpires;
         private TimeSpan? _cachedValueTimeout;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CachedLayoutRendererWrapper"/> class.
-        /// </summary>
-        public CachedLayoutRendererWrapper()
-        {
-            Cached = true;
-            ClearCache = ClearCacheOption.OnInit | ClearCacheOption.OnClose;
-        }
-
-        /// <summary>
         /// Gets or sets a value indicating whether this <see cref="CachedLayoutRendererWrapper"/> is enabled.
         /// </summary>
-        /// <docgen category='Caching Options' order='10' />
-        [DefaultValue(true)]
-        public bool Cached { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool Cached { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating when the cache is cleared.
         /// </summary>
-        /// <docgen category='Caching Options' order='10' />
-        public ClearCacheOption ClearCache { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public ClearCacheOption ClearCache { get; set; } = ClearCacheOption.OnInit | ClearCacheOption.OnClose;
 
         /// <summary>
         /// Cachekey. If the cachekey changes, resets the value. For example, the cachekey would be the current day.s
         /// </summary>
-        /// <docgen category='Caching Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public Layout CacheKey { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating how many seconds the value should stay cached until it expires
         /// </summary>
-        /// <docgen category='Caching Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public int CachedSeconds
         {
             get => (int)(_cachedValueTimeout?.TotalSeconds ?? 0.0);
@@ -114,9 +104,7 @@ namespace NLog.LayoutRenderers.Wrappers
             }
         }
 
-        /// <summary>
-        /// Initializes the layout renderer.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeLayoutRenderer()
         {
             base.InitializeLayoutRenderer();
@@ -124,9 +112,7 @@ namespace NLog.LayoutRenderers.Wrappers
                 _cachedValue = null;
         }
 
-        /// <summary>
-        /// Closes the layout renderer.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void CloseLayoutRenderer()
         {
             base.CloseLayoutRenderer();
@@ -134,31 +120,36 @@ namespace NLog.LayoutRenderers.Wrappers
                 _cachedValue = null;
         }
 
-        /// <summary>
-        /// Transforms the output of another layout.
-        /// </summary>
-        /// <param name="text">Output to be transform.</param>
-        /// <returns>Transformed text.</returns>
+        /// <inheritdoc/>
         protected override string Transform(string text)
         {
             return text;
         }
 
-        /// <summary>
-        /// Renders the inner layout contents.
-        /// </summary>
-        /// <param name="logEvent">The log event.</param>
-        /// <returns>Contents of inner layout.</returns>
+        /// <inheritdoc/>
         protected override string RenderInner(LogEventInfo logEvent)
         {
             if (Cached)
             {
-                if (InvalidateCachedValue(logEvent))
+                var newCacheKey = CacheKey?.Render(logEvent) ?? string.Empty;
+                var cachedValue = LookupValidCachedValue(logEvent, newCacheKey);
+
+                if (cachedValue is null)
                 {
-                    _cachedValue = base.RenderInner(logEvent);
+                    lock (_lockObject)
+                    {
+                        cachedValue = LookupValidCachedValue(logEvent, newCacheKey);
+                        if (cachedValue is null)
+                        {
+                            _cachedValue = cachedValue = base.RenderInner(logEvent);
+                            _renderedCacheKey = newCacheKey;
+                            if (_cachedValueTimeout.HasValue)
+                                _cachedValueExpires = logEvent.TimeStamp + _cachedValueTimeout.Value;
+                        }
+                    }
                 }
 
-                return _cachedValue;
+                return cachedValue;
             }
             else
             {
@@ -166,21 +157,17 @@ namespace NLog.LayoutRenderers.Wrappers
             }
         }
 
-        bool InvalidateCachedValue(LogEventInfo logEvent)
+        string LookupValidCachedValue(LogEventInfo logEvent, string newCacheKey)
         {
-            var newCacheKey = CacheKey?.Render(logEvent);
-            if (_cachedValue == null || _renderedCacheKey != newCacheKey || (_cachedValueTimeout.HasValue && logEvent.TimeStamp > _cachedValueExpires))
-            {
-                _renderedCacheKey = newCacheKey;
-                if (_cachedValueTimeout.HasValue)
-                    _cachedValueExpires = logEvent.TimeStamp + _cachedValueTimeout.Value;
-                return true;
-            }
+            if (_renderedCacheKey != newCacheKey)
+                return null;
 
-            return false;
+            if (_cachedValueTimeout.HasValue && logEvent.TimeStamp > _cachedValueExpires)
+                return null;
+
+            return _cachedValue;
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => Cached ? RenderInner(logEvent) : null;
     }
 }

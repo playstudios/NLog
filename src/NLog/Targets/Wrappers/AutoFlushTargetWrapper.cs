@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,16 +41,18 @@ namespace NLog.Targets.Wrappers
     /// Causes a flush on a wrapped target if LogEvent satisfies the <see cref="Condition"/>.
     /// If condition isn't set, flushes on each write.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/AutoFlushWrapper-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/AutoFlushWrapper-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/AutoFlushWrapper/NLog.config" />
     /// <p>
-    /// The above examples assume just one target and a single rule. See below for
-    /// a programmatic configuration that's equivalent to the above config file:
+    /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/AutoFlushWrapper/Simple/Example.cs" />
     /// </example>
@@ -67,6 +69,8 @@ namespace NLog.Targets.Wrappers
         /// <summary>
         /// Delay the flush until the LogEvent has been confirmed as written
         /// </summary>
+        /// <remarks>If not explicitly set, then disabled by default for <see cref="BufferingTargetWrapper"/> and AsyncTaskTarget
+        /// </remarks>
         /// <docgen category='General Options' order='10' />
         public bool AsyncFlush
         {
@@ -111,9 +115,7 @@ namespace NLog.Targets.Wrappers
             WrappedTarget = wrappedTarget;
         }
 
-        /// <summary>
-        /// Initializes the target.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
@@ -128,7 +130,7 @@ namespace NLog.Targets.Wrappers
             if (wrappedTarget is BufferingTargetWrapper)
                 return false;
 
-#if !NET3_5
+#if !NET35
             if (wrappedTarget is AsyncTaskTarget)
                 return false;
 #endif
@@ -144,14 +146,14 @@ namespace NLog.Targets.Wrappers
         /// <param name="logEvent">Logging event to be written out.</param>
         protected override void Write(AsyncLogEventInfo logEvent)
         {
-            if (Condition == null || Condition.Evaluate(logEvent.LogEvent).Equals(true))
+            if (Condition is null || Condition.Evaluate(logEvent.LogEvent).Equals(ConditionExpression.BoxedTrue))
             {
                 if (AsyncFlush)
                 {
                     AsyncContinuation currentContinuation = logEvent.Continuation;
                     AsyncContinuation wrappedContinuation = (ex) =>
                     {
-                        if (ex == null)
+                        if (ex is null)
                             FlushOnCondition();
                         _pendingManualFlushList.CompleteOperation(ex);
                         currentContinuation(ex);
@@ -197,9 +199,7 @@ namespace NLog.Targets.Wrappers
             WrappedTarget.Flush(wrappedContinuation);
         }
 
-        /// <summary>
-        /// Closes the target.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void CloseTarget()
         {
             _pendingManualFlushList.Clear(); // Maybe consider to wait a short while if pending requests?

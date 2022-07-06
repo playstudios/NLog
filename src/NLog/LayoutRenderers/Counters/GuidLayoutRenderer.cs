@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
@@ -43,22 +42,19 @@ namespace NLog.LayoutRenderers
     /// Globally-unique identifier (GUID).
     /// </summary>
     [LayoutRenderer("guid")]
-    [ThreadSafe]
     [ThreadAgnostic]
     public class GuidLayoutRenderer : LayoutRenderer, IRawValue, IStringValueRenderer
     {
         /// <summary>
         /// Gets or sets the GUID format as accepted by Guid.ToString() method.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue("N")]
+        /// <docgen category='Layout Options' order='10' />
         public string Format { get; set; } = "N";
 
         /// <summary>
         /// Generate the Guid from the NLog LogEvent (Will be the same for all targets)
         /// </summary>
-        /// <docgen category='Rendering Options' order='100' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='100' />
         public bool GeneratedFromLogEvent { get; set; }
 
         /// <inheritdoc/>
@@ -67,14 +63,12 @@ namespace NLog.LayoutRenderers
             builder.Append(GetStringValue(logEvent));
         }
 
-        /// <inheritdoc/>
         bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             value = GetValue(logEvent);
             return true;
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => GetStringValue(logEvent);
 
         private string GetStringValue(LogEventInfo logEvent)

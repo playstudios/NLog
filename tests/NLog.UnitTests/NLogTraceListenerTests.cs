@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -324,17 +324,11 @@ namespace NLog.UnitTests
         [Fact]
         public void TraceTargetWriteLineTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
-                <nlog>
-                    <targets>
-                        <target name='trace' type='Trace' layout='${logger} ${level} ${message}' rawWrite='true' />
-                    </targets>
-                    <rules>
-                        <logger name='*' minlevel='Trace' writeTo='trace' />
-                    </rules>
-                </nlog>");
+            var logger = new LogFactory().Setup().LoadConfiguration(builder =>
+            {
+                builder.ForLogger().WriteToTrace(layout: "${logger} ${level} ${message}", rawWrite: true);
+            }).GetLogger("MySource1");
 
-            var logger = LogManager.GetLogger("MySource1");
             var sw = new System.IO.StringWriter();
 
             try

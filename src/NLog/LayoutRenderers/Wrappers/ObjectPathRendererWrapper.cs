@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,11 +44,10 @@ namespace NLog.LayoutRenderers.Wrappers
     /// </summary>
     [LayoutRenderer("Object-Path")]
     [AmbientProperty(nameof(ObjectPath))]
-    [ThreadSafe]
     [ThreadAgnostic]
     public sealed class ObjectPathRendererWrapper : WrapperLayoutRendererBase, IRawValue
     {
-        private ObjectReflectionCache ObjectReflectionCache => _objectReflectionCache ?? (_objectReflectionCache = new ObjectReflectionCache(LoggingConfiguration.GetServiceResolver()));
+        private ObjectReflectionCache ObjectReflectionCache => _objectReflectionCache ?? (_objectReflectionCache = new ObjectReflectionCache(LoggingConfiguration.GetServiceProvider()));
         private ObjectReflectionCache _objectReflectionCache;
         private ObjectPropertyPath _objectPropertyPath;
 
@@ -57,7 +56,7 @@ namespace NLog.LayoutRenderers.Wrappers
         ///
         /// Shortcut for <see cref="ObjectPath"/>
         /// </summary>
-        /// <docgen category="Transformation Options" order="10"/>
+        /// <docgen category="Layout Options" order="10"/>
         public string Path
         {
             get => ObjectPath;
@@ -67,7 +66,7 @@ namespace NLog.LayoutRenderers.Wrappers
         /// <summary>
         /// Gets or sets the object-property-navigation-path for lookup of nested property
         /// </summary>
-        /// <docgen category="Transformation Options" order="10"/>
+        /// <docgen category="Layout Options" order="10"/>
         public string ObjectPath
         {
             get => _objectPropertyPath.Value;
@@ -77,22 +76,22 @@ namespace NLog.LayoutRenderers.Wrappers
         /// <summary>
         /// Format string for conversion from object to string.
         /// </summary>
-        /// <docgen category="Transformation Options" order="100"/>
+        /// <docgen category="Layout Options" order="100"/>
         public string Format { get; set; }
 
         /// <summary>
         /// Gets or sets the culture used for rendering. 
         /// </summary>
-        /// <docgen category="Transformation Options" order="100"/>
+        /// <docgen category="Layout Options" order="100"/>
         public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override string Transform(string text)
         {
             throw new NotSupportedException();
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void RenderInnerAndTransform(LogEventInfo logEvent, StringBuilder builder, int orgLength)
         {
             if (TryGetRawValue(logEvent, out object rawValue))
@@ -102,7 +101,7 @@ namespace NLog.LayoutRenderers.Wrappers
             }
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         private bool TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             if (Inner != null &&

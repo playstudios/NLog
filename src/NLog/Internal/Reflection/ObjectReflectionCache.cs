@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,7 +36,7 @@ namespace NLog.Internal
     using System;
     using System.Collections;
     using System.Collections.Generic;
-#if DYNAMIC_OBJECT
+#if !NET35 && !NET40 && !NETSTANDARD1_3 && !NETSTANDARD1_5
     using System.Dynamic;
 #endif
     using System.Linq;
@@ -49,9 +49,10 @@ namespace NLog.Internal
     /// </summary>
     internal class ObjectReflectionCache : IObjectTypeTransformer
     {
-        private readonly MruCache<Type, ObjectPropertyInfos> _objectTypeCache = new MruCache<Type, ObjectPropertyInfos>(10000);
+        private MruCache<Type, ObjectPropertyInfos> ObjectTypeCache => _objectTypeCache ?? System.Threading.Interlocked.CompareExchange(ref _objectTypeCache, new MruCache<Type, ObjectPropertyInfos>(10000), null) ?? _objectTypeCache;
+        private MruCache<Type, ObjectPropertyInfos> _objectTypeCache;
         private readonly IServiceProvider _serviceProvider;
-        private IObjectTypeTransformer ObjectTypeTransformation => _objectTypeTransformation ?? (_objectTypeTransformation = _serviceProvider?.ResolveService<IObjectTypeTransformer>() ?? this);
+        private IObjectTypeTransformer ObjectTypeTransformation => _objectTypeTransformation ?? (_objectTypeTransformation = _serviceProvider?.GetService<IObjectTypeTransformer>() ?? this);
         private IObjectTypeTransformer _objectTypeTransformation;
 
         public ObjectReflectionCache(IServiceProvider serviceProvider)
@@ -92,7 +93,7 @@ namespace NLog.Internal
 
             var objectType = value.GetType();
             var propertyInfos = BuildObjectPropertyInfos(value, objectType);
-            _objectTypeCache.TryAddValue(objectType, propertyInfos);
+            ObjectTypeCache.TryAddValue(objectType, propertyInfos);
             return new ObjectPropertyList(value, propertyInfos.Properties, propertyInfos.FastLookup);
         }
 
@@ -103,14 +104,14 @@ namespace NLog.Internal
         {
             foundValue = null;
 
-            if (objectPath == null)
+            if (objectPath is null)
             {
                 return false;
             }
 
             for (int i = 0; i < objectPath.Length; ++i)
             {
-                if (value == null)
+                if (value is null)
                 {
                     // Found null
                     foundValue = null;
@@ -141,7 +142,7 @@ namespace NLog.Internal
                 return true;
             }
 
-#if DYNAMIC_OBJECT
+#if !NET35 && !NET40 && !NETSTANDARD1_3 && !NETSTANDARD1_5
             if (value is DynamicObject d)
             {
                 var dictionary = DynamicObjectToDict(d);
@@ -151,13 +152,13 @@ namespace NLog.Internal
 #endif
 
             Type objectType = value.GetType();
-            if (_objectTypeCache.TryGetValue(objectType, out var propertyInfos))
+            if (ObjectTypeCache.TryGetValue(objectType, out var propertyInfos))
             {
                 if (!propertyInfos.HasFastLookup)
                 {
                     var fastLookup = BuildFastLookup(propertyInfos.Properties, false);
                     propertyInfos = new ObjectPropertyInfos(propertyInfos.Properties, fastLookup);
-                    _objectTypeCache.TryAddValue(objectType, propertyInfos);
+                    ObjectTypeCache.TryAddValue(objectType, propertyInfos);
                 }
                 objectPropertyList = new ObjectPropertyList(value, propertyInfos.Properties, propertyInfos.FastLookup);
                 return true;
@@ -165,7 +166,7 @@ namespace NLog.Internal
 
             if (TryExtractExpandoObject(objectType, out propertyInfos))
             {
-                _objectTypeCache.TryAddValue(objectType, propertyInfos);
+                ObjectTypeCache.TryAddValue(objectType, propertyInfos);
                 objectPropertyList = new ObjectPropertyList(value, propertyInfos.Properties, propertyInfos.FastLookup);
                 return true;
             }
@@ -228,13 +229,16 @@ namespace NLog.Internal
                 return true;
 
             if (typeof(MemberInfo).IsAssignableFrom(objectType))
-                return true;
+                return true;    // Skip serializing all types in the application
 
             if (typeof(Assembly).IsAssignableFrom(objectType))
-                return true;
+                return true;    // Skip serializing all types in the application
 
             if (typeof(Module).IsAssignableFrom(objectType))
-                return true;
+                return true;    // Skip serializing all types in the application
+
+            if (typeof(System.IO.Stream).IsAssignableFrom(objectType))
+                return true;    // Skip serializing properties that often throws exceptions
 
             return false;
         }
@@ -306,7 +310,7 @@ namespace NLog.Internal
             {
                 public readonly string Name;
                 public readonly object Value;
-                public TypeCode TypeCode => Value == null ? TypeCode.Empty : _typecode;
+                public TypeCode TypeCode => Value is null ? TypeCode.Empty : _typecode;
                 private readonly TypeCode _typecode;
                 public bool HasNameAndValue => Name != null && Value != null;
 
@@ -332,7 +336,9 @@ namespace NLog.Internal
                 }
             }
 
-            public bool ConvertToString => _properties?.Length == 0;
+            public bool IsSimpleValue => _properties?.Length == 0;
+
+            public object ObjectValue => _object;
 
             internal ObjectPropertyList(object value, PropertyInfo[] properties, FastPropertyLookup[] fastLookup)
             {
@@ -486,7 +492,7 @@ namespace NLog.Internal
                         }
                         catch (Exception ex)
                         {
-                            InternalLogger.Warn(ex, "Failed to get property value for object: {0}", _owner);
+                            InternalLogger.Debug(ex, "Failed to get property value for object: {0}", _owner);
                             return default(PropertyValue);
                         }
                     }
@@ -554,7 +560,7 @@ namespace NLog.Internal
             }
         }
 
-#if DYNAMIC_OBJECT
+#if !NET35 && !NET40 && !NETSTANDARD1_3 && !NETSTANDARD1_5
         private static Dictionary<string, object> DynamicObjectToDict(DynamicObject d)
         {
             var newVal = new Dictionary<string, object>();
@@ -579,7 +585,7 @@ namespace NLog.Internal
             {
             }
 
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public override DynamicMetaObject FallbackGetMember(DynamicMetaObject target, DynamicMetaObject errorSuggestion)
             {
                 return target;
@@ -592,7 +598,7 @@ namespace NLog.Internal
             if (interfaceType.IsGenericType())
             {
                 if (interfaceType.GetGenericTypeDefinition() == typeof(IDictionary<,>)
-#if NET4_5
+#if !NET35
                  || interfaceType.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)
 #endif
                    )
@@ -621,7 +627,7 @@ namespace NLog.Internal
                     if (dictionary.Count > 0)
                         return YieldEnumerator(dictionary);
                 }
-#if NET4_5
+#if !NET35
                 else if (value is IReadOnlyDictionary<TKey, TValue> readonlyDictionary)
                 {
                     if (readonlyDictionary.Count > 0)
@@ -637,7 +643,7 @@ namespace NLog.Internal
                     yield return new KeyValuePair<string, object>(item.Key.ToString(), item.Value);
             }
 
-#if NET4_5
+#if !NET35
             private IEnumerator<KeyValuePair<string, object>> YieldEnumerator(IReadOnlyDictionary<TKey, TValue> dictionary)
             {
                 foreach (var item in dictionary)

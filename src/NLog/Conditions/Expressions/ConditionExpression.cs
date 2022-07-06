@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,6 +41,7 @@ namespace NLog.Conditions
     /// <summary>
     /// Base class for representing nodes in condition expression trees.
     /// </summary>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/Conditions">Documentation on NLog Wiki</seealso>
     [NLogConfigurationItem]
     public abstract class ConditionExpression
     {
@@ -84,9 +85,6 @@ namespace NLog.Conditions
         /// <summary>
         /// Returns a string representation of the expression.
         /// </summary>
-        /// <returns>
-        /// A <see cref="T:System.String"/> that represents the condition expression.
-        /// </returns>
         public abstract override string ToString();
 
         /// <summary>

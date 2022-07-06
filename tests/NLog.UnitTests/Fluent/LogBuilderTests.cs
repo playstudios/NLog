@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,22 +31,20 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System.Collections.Generic;
-using System.Globalization;
-using NLog.Config;
-using NLog.Targets;
-using NLog.UnitTests.Common;
-
 namespace NLog.UnitTests.Fluent
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
-    using Xunit;
+    using NLog.Config;
     using NLog.Fluent;
+    using NLog.Targets;
+    using Xunit;
 
+    [Obsolete("Obsoleted since it allocates unnecessary. Instead use ILogger.ForLogEvent and LogEventBuilder. Obsoleted in NLog 5.0")]
     public class LogBuilderTests : NLogTestBase
     {
-        private static readonly ILogger _logger = LogManager.GetLogger("logger1");
+        private static readonly Logger _logger = LogManager.GetLogger("logger1");
 
         private LogEventInfo _lastLogEventInfo;
 
@@ -71,7 +69,7 @@ namespace NLog.UnitTests.Fluent
             TraceWrite_internal(() => _logger.Trace());
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void TraceWrite_static_builder()
         {
@@ -181,7 +179,7 @@ namespace NLog.UnitTests.Fluent
                 expectedEvent.Properties["prop2"] = "2";
                 AssertLastLogEventTarget(expectedEvent);
 
-#if NET4_5
+#if !NET35 && !NET40
                 Assert.Equal(GetType().ToString(), _lastLogEventInfo.CallerClassName);
 #endif
             }
@@ -219,7 +217,7 @@ namespace NLog.UnitTests.Fluent
             }
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void LevelWriteProperties()
         {
@@ -317,7 +315,7 @@ namespace NLog.UnitTests.Fluent
             InfoWrite_internal(() => _logger.Info());
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void InfoWrite_static_builder()
         {
@@ -367,7 +365,7 @@ namespace NLog.UnitTests.Fluent
             ErrorWrite_internal(() => _logger.Debug(), LogLevel.Debug);
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void DebugWrite_static_builder()
         {
@@ -381,7 +379,7 @@ namespace NLog.UnitTests.Fluent
             ErrorWrite_internal(() => _logger.Fatal(), LogLevel.Fatal);
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void FatalWrite_static_builder()
         {
@@ -395,7 +393,7 @@ namespace NLog.UnitTests.Fluent
             ErrorWrite_internal(() => _logger.Error(), LogLevel.Error);
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void ErrorWrite_static_builder()
         {
@@ -475,7 +473,7 @@ namespace NLog.UnitTests.Fluent
         [Fact]
         public void LogBuilder_message_cultureTest()
         {
-            if (IsTravis())
+            if (IsLinux())
             {
                 Console.WriteLine("[SKIP] LogBuilderTests.LogBuilder_message_cultureTest because we are running in Travis");
                 return;

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -43,7 +43,6 @@ namespace NLog.LayoutRenderers
     /// </summary>
     [LayoutRenderer("message")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class MessageLayoutRenderer : LayoutRenderer, IStringValueRenderer
     {
         /// <summary>
@@ -96,7 +95,7 @@ namespace NLog.LayoutRenderers
             if (WithException && logEvent.Exception != null)
             {
                 var primaryException = logEvent.Exception;
-#if !NET3_5
+#if !NET35
                 if (logEvent.Exception is AggregateException aggregateException)
                 {
                     aggregateException = aggregateException.Flatten();
@@ -109,7 +108,6 @@ namespace NLog.LayoutRenderers
             }
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent)
         {
             if (WithException)

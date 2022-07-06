@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,12 +31,11 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using NLog.Config;
-
 namespace NLog.UnitTests.LayoutRenderers
 {
+    using NLog.Config;
+    using NLog.Layouts;
     using Xunit;
-    using NLog.Fluent;
 
     public class CounterTests : NLogTestBase
     {
@@ -51,7 +50,7 @@ namespace NLog.UnitTests.LayoutRenderers
                 </rules>
             </nlog>");
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = LogManager.GetLogger("A");
             logger.Debug("a");
             logger.Info("a");
             AssertDebugLastMessage("debug", "a 1 1");
@@ -75,17 +74,15 @@ namespace NLog.UnitTests.LayoutRenderers
                 </rules>
             </nlog>");
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = LogManager.GetLogger("A");
 
-
-
-            logger.Info().Message("a").Property("context1", "seq1").Write();
+            logger.WithProperty("context1", "seq1").Info("a");
             AssertDebugLastMessage("debug", "a 1 1");
-            logger.Info().Message("a").Property("context1", "seq1").Write();
-            AssertDebugLastMessage("debug", "a 2 2"); 
-            logger.Info().Message("a").Property("context1", "seq2").Write();
+            logger.WithProperty("context1", "seq1").Info("a");
+            AssertDebugLastMessage("debug", "a 2 2");
+            logger.WithProperty("context1", "seq2").Info("a");
             AssertDebugLastMessage("debug", "a 1 3");
-            logger.Info().Message("a").Property("context1", "seq1").Write();
+            logger.WithProperty("context1", "seq1").Info("a");
             AssertDebugLastMessage("debug", "a 3 4");
         }
 
@@ -100,7 +97,7 @@ namespace NLog.UnitTests.LayoutRenderers
                 </rules>
             </nlog>");
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = LogManager.GetLogger("A");
             logger.Debug("a");
             logger.Info("a");
             AssertDebugLastMessage("debug", "a 1 1");
@@ -135,6 +132,25 @@ namespace NLog.UnitTests.LayoutRenderers
             AssertDebugLastMessage("debug2", "a 1");
             LogManager.GetLogger("debug3").Debug("a");
             AssertDebugLastMessage("debug3", "a 2");
+        }
+
+        [Fact]
+        public void CounterRawValueTest()
+        {
+            // Arrange
+            SimpleLayout l = "${counter}";
+
+            // Act
+            var success1 = l.TryGetRawValue(LogEventInfo.CreateNullEvent(), out var value1);
+            var success2 = l.TryGetRawValue(LogEventInfo.CreateNullEvent(), out var value2);
+
+            // Assert
+            Assert.True(success1, "success1");
+            Assert.True(success2, "success2");
+            Assert.IsType<long>(value1);
+            Assert.IsType<long>(value2);
+            Assert.Equal(1L, value1);
+            Assert.Equal(2L, value2);
         }
     }
 }

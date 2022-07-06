@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,8 +42,8 @@ namespace NLog.Targets.FileArchiveModes
     /// <summary>
     /// Archives the log-files using a sequence style numbering. The most recent archive has the highest number.
     /// 
-    /// When the number of archive files exceed <see cref="P:MaxArchiveFiles"/> the obsolete archives are deleted.
-    /// When the age of archive files exceed <see cref="P:MaxArchiveDays"/> the obsolete archives are deleted.
+    /// When the number of archive files exceed <see cref="FileTarget.MaxArchiveFiles"/> the obsolete archives are deleted.
+    /// When the age of archive files exceed <see cref="FileTarget.MaxArchiveDays"/> the obsolete archives are deleted.
     /// </summary>
     internal sealed class FileArchiveModeSequence : FileArchiveModeBase
     {
@@ -76,7 +76,7 @@ namespace NLog.Targets.FileArchiveModes
                 return null;
             }
             
-            var creationTimeUtc = archiveFile.LookupValidFileCreationTimeUtc().Value;
+            var creationTimeUtc = archiveFile.LookupValidFileCreationTimeUtc();
             var creationTime = creationTimeUtc > DateTime.MinValue ? NLog.Time.TimeSource.Current.FromSystemTime(creationTimeUtc) : DateTime.MinValue;
             return new DateAndSequenceArchive(archiveFile.FullName, creationTime, string.Empty, num);
         }

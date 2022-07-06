@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -78,6 +78,27 @@ namespace NLog.UnitTests.LayoutRenderers
             GlobalDiagnosticsContext.Set("appid", new { AppId = 123 });
             LogManager.GetLogger("A").Debug("a");
             AssertDebugLastMessage("debug", "{\"AppId\":123} a");
+        }
+
+        [Fact]
+        public void GDCIgnoreCaseTest()
+        {
+            try
+            {
+                string expectedValue = "Hello";
+                GlobalDiagnosticsContext.Clear();
+
+                // Act
+                GlobalDiagnosticsContext.Set(nameof(GDCIgnoreCaseTest), expectedValue);
+
+                // Assert
+                Assert.Equal(expectedValue, GlobalDiagnosticsContext.Get(nameof(GDCIgnoreCaseTest)));
+                Assert.Equal(expectedValue, GlobalDiagnosticsContext.Get(nameof(GDCIgnoreCaseTest).ToLower()));
+            }
+            finally
+            {
+                GlobalDiagnosticsContext.Clear();
+            }
         }
     }
 }

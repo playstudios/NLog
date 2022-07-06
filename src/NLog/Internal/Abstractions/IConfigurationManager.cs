@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -40,12 +40,14 @@ namespace NLog.Internal
     /// <summary>
     /// Interface for the wrapper around System.Configuration.ConfigurationManager.
     /// </summary>
-    public interface IConfigurationManager
+    internal interface IConfigurationManager
     {
         /// <summary>
         /// Gets the wrapper around ConfigurationManager.AppSettings.
         /// </summary>
         NameValueCollection AppSettings { get; }
+
+        System.Configuration.ConnectionStringSettings LookupConnectionString(string name);
     }
 }
 

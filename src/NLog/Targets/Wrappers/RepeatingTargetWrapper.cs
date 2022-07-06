@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,26 +33,24 @@
 
 namespace NLog.Targets.Wrappers
 {
-    using System;
-    using System.ComponentModel;
-    using System.Threading;
-    using Common;
-    using Internal;
+    using NLog.Common;
 
     /// <summary>
     /// Repeats each log event the specified number of times.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/RepeatingWrapper-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/RepeatingWrapper-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>This example causes each log message to be repeated 3 times.</p>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/RepeatingWrapper/NLog.config" />
     /// <p>
-    /// The above examples assume just one target and a single rule. See below for
-    /// a programmatic configuration that's equivalent to the above config file:
+    /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/RepeatingWrapper/Simple/Example.cs" />
     /// </example>
@@ -88,14 +86,12 @@ namespace NLog.Targets.Wrappers
         {
             WrappedTarget = wrappedTarget;
             RepeatCount = repeatCount;
-            OptimizeBufferReuse = GetType() == typeof(RepeatingTargetWrapper);  // Class not sealed, reduce breaking changes
         }
 
         /// <summary>
         /// Gets or sets the number of times to repeat each log message.
         /// </summary>
         /// <docgen category='Repeating Options' order='10' />
-        [DefaultValue(3)]
         public int RepeatCount { get; set; }
 
         /// <summary>

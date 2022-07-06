@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -114,6 +114,11 @@ namespace NLog.Conditions
         /// </summary>
         public MethodInfo MethodInfo { get; }
 
+        /// <summary>
+        /// Gets the method parameters
+        /// </summary>
+        public IEnumerable<ConditionExpression> MethodParameters => _methodParameters;
+
         private static object[] CreateMethodDefaultParameters(ParameterInfo[] formalParameters, ConditionExpression[] methodParameters, int parameterOffset)
         {
             var defaultParameterCount = formalParameters.Length - methodParameters.Length - parameterOffset;
@@ -147,14 +152,11 @@ namespace NLog.Conditions
         /// <summary>
         /// Returns a string representation of the expression.
         /// </summary>
-        /// <returns>
-        /// A <see cref="T:System.String"/> that represents the condition expression.
-        /// </returns>
         public override string ToString()
         {
             var sb = new StringBuilder();
             sb.Append(_conditionMethodName);
-            sb.Append("(");
+            sb.Append('(');
 
             string separator = string.Empty;
 
@@ -165,7 +167,7 @@ namespace NLog.Conditions
                 separator = ", ";
             }
 
-            sb.Append(")");
+            sb.Append(')');
             return sb.ToString();
         }
 

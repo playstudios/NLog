@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,7 +44,6 @@ namespace NLog.LayoutRenderers.Wrappers
     /// </example>
     [LayoutRenderer("onhasproperties")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class OnHasPropertiesLayoutRendererWrapper : WrapperLayoutRendererBase
     {
         /// <inheritdoc/>
@@ -52,11 +51,11 @@ namespace NLog.LayoutRenderers.Wrappers
         {
             if (logEvent.HasProperties)
             {
-                Inner.RenderAppendBuilder(logEvent, builder);
+                Inner.Render(logEvent, builder);
             }
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override string Transform(string text)
         {
             return text;

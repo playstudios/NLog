@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -58,10 +58,9 @@ namespace NLog.Internal
 #pragma warning disable S1144 // Unused private types or members should be removed. BUT they help CoreRT to provide config through reflection
         private static readonly RequiredParameterAttribute _requiredParameterAttribute = new RequiredParameterAttribute();
         private static readonly ArrayParameterAttribute _arrayParameterAttribute = new ArrayParameterAttribute(null, string.Empty);
-        private static readonly DefaultValueAttribute _defaultValueAttribute = new DefaultValueAttribute(string.Empty);
-        private static readonly AdvancedAttribute _advancedAttribute = new AdvancedAttribute();
         private static readonly DefaultParameterAttribute _defaultParameterAttribute = new DefaultParameterAttribute();
         private static readonly NLogConfigurationIgnorePropertyAttribute _ignorePropertyAttribute = new NLogConfigurationIgnorePropertyAttribute();
+        private static readonly NLogConfigurationItemAttribute _configPropertyAttribute = new NLogConfigurationItemAttribute();
         private static readonly FlagsAttribute _flagsAttribute = new FlagsAttribute();
 #pragma warning restore S1144 // Unused private types or members should be removed
 
@@ -76,7 +75,7 @@ namespace NLog.Internal
                 { typeof(string), (stringvalue, factory) => stringvalue },
                 { typeof(int), (stringvalue, factory) => Convert.ChangeType(stringvalue.Trim(), TypeCode.Int32, CultureInfo.InvariantCulture) },
                 { typeof(bool), (stringvalue, factory) => Convert.ChangeType(stringvalue.Trim(), TypeCode.Boolean, CultureInfo.InvariantCulture) },
-                { typeof(CultureInfo), (stringvalue, factory) => new CultureInfo(stringvalue.Trim()) },
+                { typeof(CultureInfo), (stringvalue, factory) =>  TryParseCultureInfo(stringvalue) },
                 { typeof(Type),  (stringvalue, factory) => Type.GetType(stringvalue.Trim(), true) },
                 { typeof(LineEndingMode), (stringvalue, factory) => LineEndingMode.FromString(stringvalue.Trim()) },
                 { typeof(Uri), (stringvalue, factory) => new Uri(stringvalue.Trim()) }
@@ -86,56 +85,76 @@ namespace NLog.Internal
         /// <summary>
         /// Set value parsed from string.
         /// </summary>
-        /// <param name="obj">object instance to set with property <paramref name="propertyName"/></param>
-        /// <param name="propertyName">name of the property on <paramref name="obj"/></param>
-        /// <param name="value">The value to be parsed.</param>
+        /// <param name="targetObject">object instance to set with property <paramref name="propertyName"/></param>
+        /// <param name="propertyName">name of the property on <paramref name="targetObject"/></param>
+        /// <param name="stringValue">The value to be parsed.</param>
         /// <param name="configurationItemFactory"></param>
-        internal static void SetPropertyFromString(object obj, string propertyName, string value, ConfigurationItemFactory configurationItemFactory)
+        internal static void SetPropertyFromString(object targetObject, string propertyName, string stringValue, ConfigurationItemFactory configurationItemFactory)
         {
-            var objType = obj.GetType();
-            InternalLogger.Debug("Setting '{0}.{1}' to '{2}'", objType, propertyName, value);
+            var objType = targetObject.GetType();
+            InternalLogger.Debug("Setting '{0}.{1}' to '{2}'", objType, propertyName, stringValue);
 
             if (!TryGetPropertyInfo(objType, propertyName, out var propInfo))
             {
-                throw new NotSupportedException($"Parameter {propertyName} not supported on {objType.Name}");
+                throw new NLogConfigurationException($"'{objType?.Name}' cannot assign unknown property '{propertyName}'='{stringValue}'");
             }
+
+            SetPropertyFromString(targetObject, propInfo, stringValue, configurationItemFactory);
+        }
+
+        internal static void SetPropertyFromString(object targetObject, PropertyInfo propInfo, string stringValue, ConfigurationItemFactory configurationItemFactory)
+        {
+            object propertyValue = null;
 
             try
             {
-                Type propertyType = propInfo.PropertyType;
+                var propertyType = Nullable.GetUnderlyingType(propInfo.PropertyType) ?? propInfo.PropertyType;
 
-                if (!TryNLogSpecificConversion(propertyType, value, configurationItemFactory, out var newValue))
+                if (!TryNLogSpecificConversion(propertyType, stringValue, configurationItemFactory, out propertyValue))
                 {
                     if (propInfo.IsDefined(_arrayParameterAttribute.GetType(), false))
                     {
-                        throw new NotSupportedException($"Parameter {propertyName} of {objType.Name} is an array and cannot be assigned a scalar value.");
+                        throw new NotSupportedException($"'{targetObject?.GetType()?.Name}' cannot assign property '{propInfo.Name}', because property of type array and not scalar value: '{stringValue}'.");
                     }
 
-                    propertyType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
-
-                    if (!(TryGetEnumValue(propertyType, value, out newValue, true)
-                        || TryImplicitConversion(propertyType, value, out newValue)
-                        || TryFlatListConversion(obj, propInfo, value, configurationItemFactory, out newValue)
-                        || TryTypeConverterConversion(propertyType, value, out newValue)))
-                        newValue = Convert.ChangeType(value, propertyType, CultureInfo.InvariantCulture);
+                    if (!(TryGetEnumValue(propertyType, stringValue, out propertyValue, true)
+                        || TryImplicitConversion(propertyType, stringValue, out propertyValue)
+                        || TryFlatListConversion(targetObject, propInfo, stringValue, configurationItemFactory, out propertyValue)
+                        || TryTypeConverterConversion(propertyType, stringValue, out propertyValue)))
+                        propertyValue = Convert.ChangeType(stringValue, propertyType, CultureInfo.InvariantCulture);
                 }
-
-                propInfo.SetValue(obj, newValue, null);
             }
-            catch (TargetInvocationException ex)
+            catch (Exception ex)
             {
-                throw new NLogConfigurationException($"Error when setting property '{propInfo.Name}' on {objType.Name}", ex.InnerException);
-            }
-            catch (Exception exception)
-            {
-                InternalLogger.Warn(exception, "Error when setting property '{0}' on '{1}'", propInfo.Name, objType);
-
-                if (exception.MustBeRethrownImmediately())
+                if (ex.MustBeRethrownImmediately())
                 {
                     throw;
                 }
 
-                throw new NLogConfigurationException($"Error when setting property '{propInfo.Name}' on {objType.Name}", exception);
+                throw new NLogConfigurationException($"'{targetObject?.GetType()?.Name}' cannot assign property '{propInfo.Name}'='{stringValue}'. Error: {ex.Message}", ex);
+            }
+
+            SetPropertyValueForObject(targetObject, propertyValue, propInfo);
+        }
+
+        internal static void SetPropertyValueForObject(object targetObject, object value, PropertyInfo propInfo)
+        {
+            try
+            {
+                propInfo.SetValue(targetObject, value, null);
+            }
+            catch (TargetInvocationException ex)
+            {
+                throw new NLogConfigurationException($"'{targetObject?.GetType()?.Name}' cannot assign property '{propInfo.Name}'", ex.InnerException ?? ex);
+            }
+            catch (Exception ex)
+            {
+                if (ex.MustBeRethrownImmediately())
+                {
+                    throw;
+                }
+
+                throw new NLogConfigurationException($"'{targetObject?.GetType()?.Name}' cannot assign property '{propInfo.Name}'. Error={ex.Message}", ex);
             }
         }
 
@@ -159,7 +178,7 @@ namespace NLog.Internal
 
         internal static bool IsConfigurationItemType(Type type)
         {
-            if (type == null || IsSimplePropertyType(type))
+            if (type is null || IsSimplePropertyType(type))
                 return false;
 
             if (typeof(LayoutRenderers.LayoutRenderer).IsAssignableFrom(type))
@@ -207,7 +226,7 @@ namespace NLog.Internal
                 if (propInfo.IsDefined(_requiredParameterAttribute.GetType(), false))
                 {
                     object value = propInfo.GetValue(o, null);
-                    if (value == null)
+                    if (value is null)
                     {
                         throw new NLogConfigurationException(
                             $"Required parameter '{propInfo.Name}' on '{o}' was not specified.");
@@ -248,7 +267,7 @@ namespace NLog.Internal
                 }
 
                 MethodInfo operatorImplicitMethod = resultType.GetMethod("op_Implicit", BindingFlags.Public | BindingFlags.Static, null, new Type[] { value.GetType() }, null);
-                if (operatorImplicitMethod == null || !resultType.IsAssignableFrom(operatorImplicitMethod.ReturnType))
+                if (operatorImplicitMethod is null || !resultType.IsAssignableFrom(operatorImplicitMethod.ReturnType))
                 {
                     result = null;
                     return false;
@@ -273,6 +292,14 @@ namespace NLog.Internal
                 return true;
             }
 
+            if (propertyType.IsGenericType() && propertyType.GetGenericTypeDefinition() == typeof(Layout<>))
+            {
+                var simpleLayout = new SimpleLayout(value, configurationItemFactory);
+                var concreteType = typeof(Layout<>).MakeGenericType(propertyType.GetGenericArguments());
+                newValue = Activator.CreateInstance(concreteType, BindingFlags.Instance | BindingFlags.Public, null, new object[] { simpleLayout }, null);
+                return true;
+            }
+
             newValue = null;
             return false;
         }
@@ -292,7 +319,7 @@ namespace NLog.Internal
                 foreach (string v in value.SplitAndTrimTokens(','))
                 {
                     FieldInfo enumField = resultType.GetField(v, BindingFlags.IgnoreCase | BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Public);
-                    if (enumField == null)
+                    if (enumField is null)
                     {
                         throw new NLogConfigurationException($"Invalid enumeration value '{value}'.");
                     }
@@ -308,7 +335,7 @@ namespace NLog.Internal
             else
             {
                 FieldInfo enumField = resultType.GetField(value, BindingFlags.IgnoreCase | BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Public);
-                if (enumField == null)
+                if (enumField is null)
                 {
                     throw new NLogConfigurationException($"Invalid enumeration value '{value}'.");
                 }
@@ -316,6 +343,15 @@ namespace NLog.Internal
                 result = enumField.GetValue(null);
                 return true;
             }
+        }
+
+        private static object TryParseCultureInfo(string stringValue)
+        {
+            stringValue = stringValue?.Trim();
+            if (string.IsNullOrEmpty(stringValue))
+                return CultureInfo.InvariantCulture;
+            else
+                return new CultureInfo(stringValue);
         }
 
         private static object TryParseEncodingValue(string stringValue, ConfigurationItemFactory configurationItemFactory)
@@ -334,7 +370,14 @@ namespace NLog.Internal
 
         private static object TryParseConditionValue(string stringValue, ConfigurationItemFactory configurationItemFactory)
         {
-            return ConditionParser.ParseExpression(stringValue, configurationItemFactory);
+            try
+            {
+                return ConditionParser.ParseExpression(stringValue, configurationItemFactory);
+            }
+            catch (ConditionParseException ex)
+            {
+                throw new NLogConfigurationException($"Cannot parse ConditionExpression '{stringValue}'. Error: {ex.Message}", ex);
+            }
         }
 
         /// <summary>
@@ -373,10 +416,10 @@ namespace NLog.Internal
         {
             var collectionType = propInfo.PropertyType;
             var typeDefinition = collectionType.GetGenericTypeDefinition();
-#if NET3_5
-            var isSet = typeDefinition == typeof(HashSet<>);
-#else
+#if !NET35
             var isSet = typeDefinition == typeof(ISet<>) || typeDefinition == typeof(HashSet<>);
+#else
+            var isSet = typeDefinition == typeof(HashSet<>);       
 #endif
             //not checking "implements" interface as we are creating HashSet<T> or List<T> and also those checks are expensive
             if (isSet || typeDefinition == typeof(List<>) || typeDefinition == typeof(IList<>) || typeDefinition == typeof(IEnumerable<>)) //set or list/array etc
@@ -387,15 +430,15 @@ namespace NLog.Internal
                 collectionItemType = collectionType.GetGenericArguments()[0];
                 collectionObject = CreateCollectionObjectInstance(isSet ? typeof(HashSet<>) : typeof(List<>), collectionItemType, hashsetComparer);
                 //no support for array
-                if (collectionObject == null)
+                if (collectionObject is null)
                 {
-                    throw new NLogConfigurationException("Cannot create instance of {0} for value {1}", collectionType.ToString(), valueRaw);
+                    throw new NLogConfigurationException($"Cannot create instance of {collectionType.ToString()} for value {valueRaw}");
                 }
 
                 collectionAddMethod = collectionObject.GetType().GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
-                if (collectionAddMethod == null)
+                if (collectionAddMethod is null)
                 {
-                    throw new NLogConfigurationException("Add method on type {0} for value {1} not found", collectionType.ToString(), valueRaw);
+                    throw new NLogConfigurationException($"Add method on type {collectionType.ToString()} for value {valueRaw} not found");
                 }
 
                 return true;
@@ -438,18 +481,17 @@ namespace NLog.Internal
             return null;
         }
 
-        private static bool TryTypeConverterConversion(Type type, string value, out object newValue)
+        internal static bool TryTypeConverterConversion(Type type, string value, out object newValue)
         {
             try
             {
-#if !NETSTANDARD1_3
                 var converter = TypeDescriptor.GetConverter(type);
                 if (converter.CanConvertFrom(typeof(string)))
                 {
                     newValue = converter.ConvertFromInvariantString(value);
                     return true;
                 }
-#endif
+
                 newValue = null;
                 return false;
             }
@@ -484,7 +526,7 @@ namespace NLog.Internal
 
             try
             {
-                if (!t.IsDefined(typeof(NLogConfigurationItemAttribute), true))
+                if (!t.IsDefined(_configPropertyAttribute.GetType(), true))
                 {
                     return false;
                 }
@@ -524,7 +566,7 @@ namespace NLog.Internal
 
         private static string LookupPropertySymbolName(PropertyInfo propInfo)
         {
-            if (propInfo.PropertyType == null)
+            if (propInfo.PropertyType is null)
                 return null;
 
             if (IsSimplePropertyType(propInfo.PropertyType))

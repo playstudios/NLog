@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -78,17 +78,11 @@ namespace NLog.Internal.FileAppenders
             }
             catch
             {
-                if (_mutex != null)
-                {
-                    _mutex.Close();
-                    _mutex = null;
-                }
+                _mutex?.Close();
+                _mutex = null;
 
-                if (_fileStream != null)
-                {
-                    _fileStream.Close();
-                    _fileStream = null;
-                }
+                _fileStream?.Close();
+                _fileStream = null;
 
                 throw;
             }
@@ -102,7 +96,7 @@ namespace NLog.Internal.FileAppenders
         /// <param name="count">The number of bytes.</param>
         public override void Write(byte[] bytes, int offset, int count)
         {
-            if (_mutex == null || _fileStream == null)
+            if (_mutex is null || _fileStream is null)
             {
                 return;
             }
@@ -135,12 +129,12 @@ namespace NLog.Internal.FileAppenders
         /// </summary>
         public override void Close()
         {
-            if (_mutex == null && _fileStream == null)
+            if (_mutex is null && _fileStream is null)
             {
                 return;
             }
 
-            InternalLogger.Trace("Closing '{0}'", FileName);
+            InternalLogger.Trace("{0}: Closing '{1}'", CreateFileParameters, FileName);
             try
             {
                 _mutex?.Close();
@@ -148,7 +142,7 @@ namespace NLog.Internal.FileAppenders
             catch (Exception ex)
             {
                 // Swallow exception as the mutex now is in final state (abandoned instead of closed)
-                InternalLogger.Warn(ex, "Failed to close mutex: '{0}'", FileName);
+                InternalLogger.Warn(ex, "{0}: Failed to close mutex: '{1}'", CreateFileParameters, FileName);
             }
             finally
             {
@@ -162,7 +156,7 @@ namespace NLog.Internal.FileAppenders
             catch (Exception ex)
             {
                 // Swallow exception as the file-stream now is in final state (broken instead of closed)
-                InternalLogger.Warn(ex, "Failed to close file: '{0}'", FileName);
+                InternalLogger.Warn(ex, "{0}: Failed to close file: '{1}'", CreateFileParameters, FileName);
                 AsyncHelpers.WaitForDelay(TimeSpan.FromMilliseconds(1));    // Artificial delay to avoid hammering a bad file location
             }
             finally

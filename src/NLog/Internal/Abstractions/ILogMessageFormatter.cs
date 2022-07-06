@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -40,6 +40,11 @@ namespace NLog.Internal
     /// </summary>
     internal interface ILogMessageFormatter
     {
+        /// <summary>
+        /// Perform message template parsing and formatting of LogEvent messages (True = Always, False = Never, Null = Auto Detect)
+        /// </summary>
+        bool? MessageTemplateParser { get; }
+
         /// <summary>
         /// Format the message and return
         /// </summary>

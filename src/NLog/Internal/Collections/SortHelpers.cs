@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,7 +36,7 @@ namespace NLog.Internal
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using Common;
+    using NLog.Common;
 
     /// <summary>
     /// Provides helpers to sort log events and associated continuations.
@@ -110,17 +110,15 @@ namespace NLog.Internal
         public static ReadOnlySingleBucketDictionary<TKey, IList<TValue>> BucketSort<TValue, TKey>(this IList<TValue> inputs, KeySelector<TValue, TKey> keySelector, IEqualityComparer<TKey> keyComparer)
         {
             Dictionary<TKey, IList<TValue>> buckets = null;
-            bool singleBucketFirstKey = false;
             TKey singleBucketKey = default(TKey);
             for (int i = 0; i < inputs.Count; i++)
             {
                 TKey keyValue = keySelector(inputs[i]);
-                if (!singleBucketFirstKey)
+                if (i == 0)
                 {
-                    singleBucketFirstKey = true;
                     singleBucketKey = keyValue;
                 }
-                else if (buckets == null)
+                else if (buckets is null)
                 {
                     if (!keyComparer.Equals(singleBucketKey, keyValue))
                     {
@@ -139,28 +137,24 @@ namespace NLog.Internal
                 }
             }
 
-            if (buckets != null)
-            {
-                return new ReadOnlySingleBucketDictionary<TKey, IList<TValue>>(buckets, keyComparer);
-            }
-            else
-            {
+            if (buckets is null)
                 return new ReadOnlySingleBucketDictionary<TKey, IList<TValue>>(new KeyValuePair<TKey, IList<TValue>>(singleBucketKey, inputs), keyComparer);
-            }
+            else
+                return new ReadOnlySingleBucketDictionary<TKey, IList<TValue>>(buckets, keyComparer);
         }
 
-        private static Dictionary<TKey, IList<TValue>> CreateBucketDictionaryWithValue<TValue, TKey>(IList<TValue> inputs, IEqualityComparer<TKey> keyComparer, int currentIndex, TKey singleBucketKey, TKey keyValue)
+        private static Dictionary<TKey, IList<TValue>> CreateBucketDictionaryWithValue<TValue, TKey>(IList<TValue> inputs, IEqualityComparer<TKey> keyComparer, int currentIndex, TKey firstBucketKey, TKey nextBucketKey)
         {
             var buckets = new Dictionary<TKey, IList<TValue>>(keyComparer);
-            var bucket = new List<TValue>(currentIndex);
+            var firstBucket = new List<TValue>(currentIndex);
             for (int i = 0; i < currentIndex; i++)
             {
-                bucket.Add(inputs[i]);
+                firstBucket.Add(inputs[i]);
             }
+            buckets[firstBucketKey] = firstBucket;
 
-            buckets[singleBucketKey] = bucket;
-            bucket = new List<TValue> {inputs[currentIndex]};
-            buckets[keyValue] = bucket;
+            var nextBucket = new List<TValue> { inputs[currentIndex] };
+            buckets[nextBucketKey] = nextBucket;
             return buckets;
         }
 
@@ -173,7 +167,7 @@ namespace NLog.Internal
         /// <typeparam name="TValue">The type of the value.</typeparam>
         public struct ReadOnlySingleBucketDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         {
-            readonly KeyValuePair<TKey, TValue>? _singleBucket;
+            KeyValuePair<TKey, TValue>? _singleBucket;  // Not readonly to avoid struct-copy, and to avoid VerificationException when medium-trust AppDomain
             readonly Dictionary<TKey, TValue> _multiBucket;
             readonly IEqualityComparer<TKey> _comparer;
             public IEqualityComparer<TKey> Comparer => _comparer;
@@ -262,7 +256,7 @@ namespace NLog.Internal
             public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
             {
                 bool _singleBucketFirstRead;
-                readonly KeyValuePair<TKey, TValue> _singleBucket;
+                KeyValuePair<TKey, TValue> _singleBucket;   // Not readonly to avoid struct-copy, and to avoid VerificationException when medium-trust AppDomain
                 readonly IEnumerator<KeyValuePair<TKey, TValue>> _multiBuckets;
 
                 internal Enumerator(Dictionary<TKey, TValue> multiBucket)

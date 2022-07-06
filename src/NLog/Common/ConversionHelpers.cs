@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -101,10 +101,10 @@ namespace NLog.Common
                 return false;
             }
 
-#if NET3_5
-            return TryParseEnum_net3(inputValue, ignoreCase, out resultValue);
-#else
+#if !NET35
             return Enum.TryParse(inputValue, ignoreCase, out resultValue);
+#else
+            return TryParseEnum_net3(inputValue, ignoreCase, out resultValue);            
 #endif
         }
 

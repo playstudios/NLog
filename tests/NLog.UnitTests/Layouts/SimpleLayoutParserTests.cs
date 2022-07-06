@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -66,55 +66,79 @@ namespace NLog.UnitTests.Layouts
         }
 
         [Fact]
+        public void UnknownLayoutRenderer()
+        {
+            Assert.Throws<NLogConfigurationException>(() => new SimpleLayout("'${{unknown-type}}'"));
+        }
+
+        [Fact]
+        public void UnknownLayoutRendererProperty()
+        {
+            Assert.Throws<NLogConfigurationException>(() => new SimpleLayout("${message:unknown_item=${unknown-value}}"));
+        }
+
+        [Fact]
+        public void UnknownConditionLayoutRenderer()
+        {
+            Assert.Throws<NLogConfigurationException>(() => new SimpleLayout("${when:when=Levl==LogLevel.Info:inner=Unknown}"));
+        }
+
+        [Fact]
+        public void UnknownLayoutRendererPropertyValue()
+        {
+            Assert.Throws<NLogConfigurationException>(() => new SimpleLayout("'${message:withexception=${unknown-value}}'"));
+        }
+
+        [Fact]
         public void SingleParamTest()
         {
-            SimpleLayout l = "${mdc:item=AAA}";
+            SimpleLayout l = "${event-property:item=AAA}";
             Assert.Single(l.Renderers);
-            MdcLayoutRenderer mdc = l.Renderers[0] as MdcLayoutRenderer;
-            Assert.NotNull(mdc);
-            Assert.Equal("AAA", mdc.Item);
+            var eventPropertyLayout = l.Renderers[0] as EventPropertiesLayoutRenderer;
+            Assert.NotNull(eventPropertyLayout);
+            Assert.Equal("AAA", eventPropertyLayout.Item);
         }
 
         [Fact]
         public void ValueWithColonTest()
         {
-            SimpleLayout l = "${mdc:item=AAA\\:}";
+            SimpleLayout l = "${event-property:item=AAA\\:}";
             Assert.Single(l.Renderers);
-            MdcLayoutRenderer mdc = l.Renderers[0] as MdcLayoutRenderer;
-            Assert.NotNull(mdc);
-            Assert.Equal("AAA:", mdc.Item);
+            var eventPropertyLayout = l.Renderers[0] as EventPropertiesLayoutRenderer;
+            Assert.NotNull(eventPropertyLayout);
+            Assert.Equal("AAA:", eventPropertyLayout.Item);
         }
 
         [Fact]
         public void ValueWithBracketTest()
         {
-            SimpleLayout l = "${mdc:item=AAA\\}\\:}";
-            Assert.Equal("${mdc:item=AAA\\}\\:}", l.Text);
+            SimpleLayout l = "${event-property:item=AAA\\}\\:}";
+            Assert.Equal("${event-property:item=AAA\\}\\:}", l.Text);
             Assert.Single(l.Renderers);
-            MdcLayoutRenderer mdc = l.Renderers[0] as MdcLayoutRenderer;
-            Assert.NotNull(mdc);
-            Assert.Equal("AAA}:", mdc.Item);
+            var eventPropertyLayout = l.Renderers[0] as EventPropertiesLayoutRenderer;
+            Assert.NotNull(eventPropertyLayout);
+            Assert.Equal("AAA}:", eventPropertyLayout.Item);
         }
 
         [Fact]
         public void DefaultValueTest()
         {
-            SimpleLayout l = "${mdc:BBB}";
+            SimpleLayout l = "${event-property:BBB}";
             Assert.Single(l.Renderers);
-            MdcLayoutRenderer mdc = l.Renderers[0] as MdcLayoutRenderer;
-            Assert.NotNull(mdc);
-            Assert.Equal("BBB", mdc.Item);
+            var eventPropertyLayout = l.Renderers[0] as EventPropertiesLayoutRenderer;
+            Assert.NotNull(eventPropertyLayout);
+            Assert.Equal("BBB", eventPropertyLayout.Item);
         }
 
         [Fact]
         public void DefaultValueWithBracketTest()
         {
-            SimpleLayout l = "${mdc:AAA\\}\\:}";
-            Assert.Equal("${mdc:AAA\\}\\:}", l.Text);
+            SimpleLayout l = "${event-property:AAA\\}\\:}";
+            Assert.Equal("${event-property:AAA\\}\\:}", l.Text);
             Assert.Single(l.Renderers);
-            MdcLayoutRenderer mdc = l.Renderers[0] as MdcLayoutRenderer;
-            Assert.NotNull(mdc);
-            Assert.Equal("AAA}:", mdc.Item);
+            var eventPropertyLayout = l.Renderers[0] as EventPropertiesLayoutRenderer;
+            Assert.NotNull(eventPropertyLayout);
+            Assert.Equal("AAA}:", eventPropertyLayout.Item);
         }
 
         [Fact]
@@ -131,70 +155,70 @@ namespace NLog.UnitTests.Layouts
         [Fact]
         public void EmptyValueTest()
         {
-            SimpleLayout l = "${mdc:item=}";
+            SimpleLayout l = "${event-property:item=}";
             Assert.Single(l.Renderers);
-            MdcLayoutRenderer mdc = l.Renderers[0] as MdcLayoutRenderer;
-            Assert.NotNull(mdc);
-            Assert.Equal("", mdc.Item);
+            var eventPropertyLayout = l.Renderers[0] as EventPropertiesLayoutRenderer;
+            Assert.NotNull(eventPropertyLayout);
+            Assert.Equal("", eventPropertyLayout.Item);
         }
 
         [Fact]
         public void NestedLayoutTest()
         {
-            SimpleLayout l = "${rot13:inner=${ndc:topFrames=3:separator=x}}";
+            SimpleLayout l = "${rot13:inner=${scopenested:topFrames=3:separator=x}}";
             Assert.Single(l.Renderers);
             var lr = l.Renderers[0] as Rot13LayoutRendererWrapper;
             Assert.NotNull(lr);
             var nestedLayout = lr.Inner as SimpleLayout;
             Assert.NotNull(nestedLayout);
-            Assert.Equal("${ndc:topFrames=3:separator=x}", nestedLayout.Text);
+            Assert.Equal("${scopenested:topFrames=3:separator=x}", nestedLayout.Text);
             Assert.Single(nestedLayout.Renderers);
-            var ndcLayoutRenderer = nestedLayout.Renderers[0] as NdcLayoutRenderer;
-            Assert.NotNull(ndcLayoutRenderer);
-            Assert.Equal(3, ndcLayoutRenderer.TopFrames);
-            Assert.Equal("x", ndcLayoutRenderer.Separator);
+            var nestedLayoutRenderer = nestedLayout.Renderers[0] as ScopeContextNestedStatesLayoutRenderer;
+            Assert.NotNull(nestedLayoutRenderer);
+            Assert.Equal(3, nestedLayoutRenderer.TopFrames);
+            Assert.Equal("x", nestedLayoutRenderer.Separator.ToString());
         }
 
         [Fact]
         public void DoubleNestedLayoutTest()
         {
-            SimpleLayout l = "${rot13:inner=${rot13:inner=${ndc:topFrames=3:separator=x}}}";
+            SimpleLayout l = "${rot13:inner=${rot13:inner=${scopenested:topFrames=3:separator=x}}}";
             Assert.Single(l.Renderers);
             var lr = l.Renderers[0] as Rot13LayoutRendererWrapper;
             Assert.NotNull(lr);
             var nestedLayout0 = lr.Inner as SimpleLayout;
             Assert.NotNull(nestedLayout0);
-            Assert.Equal("${rot13:inner=${ndc:topFrames=3:separator=x}}", nestedLayout0.Text);
+            Assert.Equal("${rot13:inner=${scopenested:topFrames=3:separator=x}}", nestedLayout0.Text);
             var innerRot13 = nestedLayout0.Renderers[0] as Rot13LayoutRendererWrapper;
             var nestedLayout = innerRot13.Inner as SimpleLayout;
             Assert.NotNull(nestedLayout);
-            Assert.Equal("${ndc:topFrames=3:separator=x}", nestedLayout.Text);
+            Assert.Equal("${scopenested:topFrames=3:separator=x}", nestedLayout.Text);
             Assert.Single(nestedLayout.Renderers);
-            var ndcLayoutRenderer = nestedLayout.Renderers[0] as NdcLayoutRenderer;
-            Assert.NotNull(ndcLayoutRenderer);
-            Assert.Equal(3, ndcLayoutRenderer.TopFrames);
-            Assert.Equal("x", ndcLayoutRenderer.Separator);
+            var nestedLayoutRenderer = nestedLayout.Renderers[0] as ScopeContextNestedStatesLayoutRenderer;
+            Assert.NotNull(nestedLayoutRenderer);
+            Assert.Equal(3, nestedLayoutRenderer.TopFrames);
+            Assert.Equal("x", nestedLayoutRenderer.Separator.ToString());
         }
 
         [Fact]
         public void DoubleNestedLayoutWithDefaultLayoutParametersTest()
         {
-            SimpleLayout l = "${rot13:${rot13:${ndc:topFrames=3:separator=x}}}";
+            SimpleLayout l = "${rot13:${rot13:${scopenested:topFrames=3:separator=x}}}";
             Assert.Single(l.Renderers);
             var lr = l.Renderers[0] as Rot13LayoutRendererWrapper;
             Assert.NotNull(lr);
             var nestedLayout0 = lr.Inner as SimpleLayout;
             Assert.NotNull(nestedLayout0);
-            Assert.Equal("${rot13:${ndc:topFrames=3:separator=x}}", nestedLayout0.Text);
+            Assert.Equal("${rot13:${scopenested:topFrames=3:separator=x}}", nestedLayout0.Text);
             var innerRot13 = nestedLayout0.Renderers[0] as Rot13LayoutRendererWrapper;
             var nestedLayout = innerRot13.Inner as SimpleLayout;
             Assert.NotNull(nestedLayout);
-            Assert.Equal("${ndc:topFrames=3:separator=x}", nestedLayout.Text);
+            Assert.Equal("${scopenested:topFrames=3:separator=x}", nestedLayout.Text);
             Assert.Single(nestedLayout.Renderers);
-            var ndcLayoutRenderer = nestedLayout.Renderers[0] as NdcLayoutRenderer;
-            Assert.NotNull(ndcLayoutRenderer);
-            Assert.Equal(3, ndcLayoutRenderer.TopFrames);
-            Assert.Equal("x", ndcLayoutRenderer.Separator);
+            var nestedLayoutRenderer = nestedLayout.Renderers[0] as ScopeContextNestedStatesLayoutRenderer;
+            Assert.NotNull(nestedLayoutRenderer);
+            Assert.Equal(3, nestedLayoutRenderer.TopFrames);
+            Assert.Equal("x", nestedLayoutRenderer.Separator.ToString());
         }
 
         [Fact]
@@ -284,7 +308,7 @@ namespace NLog.UnitTests.Layouts
         [Fact]
         public void LayoutParserEscapeCodesForRegExTestV1()
         {
-            MappedDiagnosticsContext.Clear();
+            ScopeContext.Clear();
 
             var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
 <nlog throwExceptions='true'>
@@ -323,7 +347,7 @@ namespace NLog.UnitTests.Layouts
         [Fact]
         public void LayoutParserEscapeCodesForRegExTestV2()
         {
-            MappedDiagnosticsContext.Clear();
+            ScopeContext.Clear();
 
             var configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
 <nlog throwExceptions='true'>
@@ -442,8 +466,6 @@ namespace NLog.UnitTests.Layouts
             Assert.Equal("Log_{#}.log", l.Render(le));
         }
 
-
-
         [Fact]
         public void InnerLayoutWithHashTest_need_escape()
         {
@@ -524,11 +546,34 @@ namespace NLog.UnitTests.Layouts
         public void InvalidLayoutWillThrowIfExceptionThrowingIsOn()
         {
             LogManager.ThrowConfigExceptions = true;
-            Assert.Throws<ArgumentException>(() =>
+            Assert.Throws<NLogConfigurationException>(() =>
             {
                 SimpleLayout l = @"aaa ${iDontExist} bbb";
             });
+        }
 
+        [Fact]
+        public void InvalidLayoutWithExistingRenderer_WillThrowIfExceptionThrowingIsOn()
+        {
+            ConfigurationItemFactory.Default.LayoutRenderers.RegisterDefinition("layoutrenderer-with-list", typeof(LayoutRendererWithListParam));
+            LogManager.ThrowConfigExceptions = true;
+            Assert.Throws<NLogConfigurationException>(() =>
+            {
+                SimpleLayout l = @"${layoutrenderer-with-list:}";
+            });
+
+        }
+
+        [Fact]
+        public void UnknownPropertyInLayout_WillThrowIfExceptionThrowingIsOn()
+        {
+            ConfigurationItemFactory.Default.LayoutRenderers.RegisterDefinition("layoutrenderer-with-list", typeof(LayoutRendererWithListParam));
+            LogManager.ThrowConfigExceptions = true;
+
+            Assert.Throws<NLogConfigurationException>(() =>
+            {
+                SimpleLayout l = @"${layoutrenderer-with-list:iDontExist=1}";
+            });
         }
 
         /// <summary>
@@ -560,13 +605,13 @@ namespace NLog.UnitTests.Layouts
         [InlineData("2,3,4", "IEnumerableNumber", "2-3-4")]
         [InlineData("2,3,4", "IListNumber", "2-3-4")]
         [InlineData("2,3,4", "HashsetNumber", "2-3-4")]
-#if !NET3_5
+#if !NET35
         [InlineData("2,3,4", "ISetNumber", "2-3-4")]
 #endif
         [InlineData("a,b,c", "IEnumerableString", "a-b-c")]
         [InlineData("a,b,c", "IListString", "a-b-c")]
         [InlineData("a,b,c", "HashSetString", "a-b-c")]
-#if !NET3_5
+#if !NET35
         [InlineData("a,b,c", "ISetString", "a-b-c")]
 #endif
         public void LayoutWithListParamTest(string input, string propname, string expected)
@@ -619,19 +664,6 @@ namespace NLog.UnitTests.Layouts
         }
 
         [Fact]
-        void FuncLayoutRendererFluentMethod_ThreadSafe_Test()
-        {
-            // Arrange
-            var layout = Layout.FromMethod(l => "42", LayoutRenderOptions.ThreadSafe);
-            // Act
-            var result = layout.Render(LogEventInfo.CreateNullEvent());
-            // Assert
-            Assert.Equal("42", result);
-            Assert.True(layout.ThreadSafe);
-            Assert.False(layout.ThreadAgnostic);
-        }
-
-        [Fact]
         void FuncLayoutRendererFluentMethod_ThreadAgnostic_Test()
         {
             // Arrange
@@ -640,12 +672,11 @@ namespace NLog.UnitTests.Layouts
             var result = layout.Render(LogEventInfo.CreateNullEvent());
             // Assert
             Assert.Equal("42", result);
-            Assert.True(layout.ThreadSafe);
             Assert.True(layout.ThreadAgnostic);
         }
 
         [Fact]
-        void FuncLayoutRendererFluentMethod_ThreadUnsafe_Test()
+        void FuncLayoutRendererFluentMethod_Test()
         {
             // Arrange
             var layout = Layout.FromMethod(l => "42", LayoutRenderOptions.None);
@@ -653,7 +684,6 @@ namespace NLog.UnitTests.Layouts
             var result = layout.Render(LogEventInfo.CreateNullEvent());
             // Assert
             Assert.Equal("42", result);
-            Assert.False(layout.ThreadSafe);
             Assert.False(layout.ThreadAgnostic);
         }
 
@@ -710,6 +740,7 @@ namespace NLog.UnitTests.Layouts
         [InlineData(null, true)]
         [InlineData("'a'", true)]
         [InlineData("${gdc:a}", false)]
+        [InlineData("${threadname}", false)]
         public void FromString_isFixedText(string input, bool expected)
         {
             // Act
@@ -725,14 +756,15 @@ namespace NLog.UnitTests.Layouts
         [InlineData(null, true)]
         [InlineData("'a'", true)]
         [InlineData("${gdc:a}", true)]
-        public void FromString_isThreadSafe(string input, bool expected)
+        [InlineData("${threadname}", false)]
+        public void FromString_isThreadAgnostic(string input, bool expected)
         {
             // Act
             var layout = (SimpleLayout)Layout.FromString(input);
             layout.Initialize(null);
 
             // Assert
-            Assert.Equal(expected, layout.ThreadSafe);
+            Assert.Equal(expected, layout.ThreadAgnostic);
         }
 
         [Theory]
@@ -750,7 +782,6 @@ namespace NLog.UnitTests.Layouts
             // Assert
             Assert.Equal(expected, result);
         }
-
 
         [Fact]
         public void Parse_AppDomainFixedOutput_ConvertToLiteral()
@@ -790,14 +821,13 @@ namespace NLog.UnitTests.Layouts
             var layout = (SimpleLayout)Layout.FromString(input);
 
             // Assert
+            Assert.True(layout.IsFixedText);
             var single = Assert.Single(layout.Renderers);
-            var singleRaw = Assert.IsType<LiteralWithRawValueLayoutRenderer>(single);
-            var succeeded = singleRaw.TryGetRawValue(LogEventInfo.CreateNullEvent(), out var rawValue);
-            Assert.True(succeeded);
+            Assert.IsType<LiteralWithRawValueLayoutRenderer>(single);
+            var succeeded = layout.TryGetRawValue(LogEventInfo.CreateNullEvent(), out var rawValue);
             var rawValueInt = Assert.IsType<int>(rawValue);
+            Assert.True(succeeded);
             Assert.True(rawValueInt > 0);
-
-
         }
 
         /// <summary>
@@ -843,7 +873,7 @@ namespace NLog.UnitTests.Layouts
 
             public IList<int> IListNumber { get; set; }
 
-#if !NET3_5
+#if !NET35
             public ISet<string> ISetString { get; set; }
 
             public ISet<int> ISetNumber { get; set; }
@@ -872,10 +902,9 @@ namespace NLog.UnitTests.Layouts
                 AppendFormattable(builder, IEnumerableNumber);
                 Append(builder, IListString);
                 AppendFormattable(builder, IListNumber);
-#if !NET3_5
+#if !NET35
                 Append(builder, ISetString);
                 AppendFormattable(builder, ISetNumber);
-
 #endif
                 Append(builder, HashSetString);
                 AppendFormattable(builder, HashSetNumber);

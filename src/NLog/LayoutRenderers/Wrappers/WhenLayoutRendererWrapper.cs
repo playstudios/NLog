@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,22 +44,21 @@ namespace NLog.LayoutRenderers.Wrappers
     /// Only outputs the inner layout when the specified condition has been met.
     /// </summary>
     [LayoutRenderer("when")]
-    [AmbientProperty("When")]
+    [AmbientProperty(nameof(When))]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class WhenLayoutRendererWrapper : WrapperLayoutRendererBase, IRawValue
     {
         /// <summary>
         /// Gets or sets the condition that must be met for the <see cref="WrapperLayoutRendererBase.Inner"/> layout to be printed.
         /// </summary>
-        /// <docgen category="Transformation Options" order="10"/>
+        /// <docgen category="Condition Options" order="10"/>
         [RequiredParameter]
         public ConditionExpression When { get; set; }
 
         /// <summary>
         /// If <see cref="When"/> is not met, print this layout.
         /// </summary>
-        /// <docgen category="Transformation Options" order="10"/>
+        /// <docgen category="Condition Options" order="10"/>
         public Layout Else { get; set; }
 
         /// <inheritdoc/>
@@ -70,11 +69,11 @@ namespace NLog.LayoutRenderers.Wrappers
             {
                 if (ShouldRenderInner(logEvent))
                 {
-                    Inner?.RenderAppendBuilder(logEvent, builder);
+                    Inner?.Render(logEvent, builder);
                 }
                 else
                 {
-                    Else?.RenderAppendBuilder(logEvent, builder);
+                    Else?.Render(logEvent, builder);
                 }
             }
             catch
@@ -92,11 +91,10 @@ namespace NLog.LayoutRenderers.Wrappers
 
         private bool ShouldRenderInner(LogEventInfo logEvent)
         {
-            return When == null || true.Equals(When.Evaluate(logEvent));
+            return When is null || true.Equals(When.Evaluate(logEvent));
         }
 
-        /// <inheritdoc />
-        public bool TryGetRawValue(LogEventInfo logEvent, out object value)
+        bool IRawValue.TryGetRawValue(LogEventInfo logEvent, out object value)
         {
             if (ShouldRenderInner(logEvent))
             {
@@ -108,7 +106,7 @@ namespace NLog.LayoutRenderers.Wrappers
 
         private static bool TryGetRawValueFromLayout(LogEventInfo logEvent, Layout layout, out object value)
         {
-            if (layout == null)
+            if (layout is null)
             {
                 value = null;
                 return false;

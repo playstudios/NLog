@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -59,14 +59,9 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Value formatter
         /// </summary>
-        protected IValueFormatter ValueFormatter => _valueFormatter ?? (_valueFormatter = Resolve<IValueFormatter>());
+        protected IValueFormatter ValueFormatter => _valueFormatter ?? (_valueFormatter = ResolveService<IValueFormatter>());
 
-        /// <summary>
-        /// Returns a <see cref="System.String"/> that represents this instance.
-        /// </summary>
-        /// <returns>
-        /// A <see cref="System.String"/> that represents this instance.
-        /// </returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
             var lra = GetType().GetFirstCustomAttribute<LayoutRendererAttribute>();
@@ -79,7 +74,7 @@ namespace NLog.LayoutRenderers
         }
 
         /// <summary>
-        /// Renders the the value of layout renderer in the context of the specified log event.
+        /// Renders the value of layout renderer in the context of the specified log event.
         /// </summary>
         /// <param name="logEvent">The log event.</param>
         /// <returns>String representation of a layout renderer.</returns>
@@ -101,18 +96,13 @@ namespace NLog.LayoutRenderers
             return builder.ToString();
         }
 
-        /// <summary>
-        /// Initializes this instance.
-        /// </summary>
-        /// <param name="configuration">The configuration.</param>
+        /// <inheritdoc/>
         void ISupportsInitialize.Initialize(LoggingConfiguration configuration)
         {
             Initialize(configuration);
         }
 
-        /// <summary>
-        /// Closes this instance.
-        /// </summary>
+        /// <inheritdoc/>
         void ISupportsInitialize.Close()
         {
             Close();
@@ -124,12 +114,11 @@ namespace NLog.LayoutRenderers
         /// <param name="configuration">The configuration.</param>
         internal void Initialize(LoggingConfiguration configuration)
         {
-            if (LoggingConfiguration == null)
+            if (LoggingConfiguration is null)
                 LoggingConfiguration = configuration;
 
             if (!_isInitialized)
             {
-                _isInitialized = true;
                 Initialize();
             }
         }
@@ -138,6 +127,7 @@ namespace NLog.LayoutRenderers
         {
             try
             {
+                PropertyHelper.CheckRequiredParameters(this);
                 InitializeLayoutRenderer();
             }
             catch (Exception ex)
@@ -147,6 +137,10 @@ namespace NLog.LayoutRenderers
                 {
                     throw;
                 }
+            }
+            finally
+            {
+                _isInitialized = true;  // Only one attempt, must Close to retry
             }
         }
 
@@ -158,6 +152,7 @@ namespace NLog.LayoutRenderers
             if (_isInitialized)
             {
                 LoggingConfiguration = null;
+                _valueFormatter = null;
                 _isInitialized = false;
                 CloseLayoutRenderer();
             }
@@ -172,7 +167,6 @@ namespace NLog.LayoutRenderers
         {
             if (!_isInitialized)
             {
-                _isInitialized = true;
                 Initialize();
             }
 
@@ -224,7 +218,7 @@ namespace NLog.LayoutRenderers
         }
 
         /// <summary>
-        /// Get the <see cref="CultureInfo"/> for rendering the messages to a <see cref="string"/>, needed for date and number formats
+        /// Get the <see cref="CultureInfo"/> for rendering the messages to a <see cref="string"/>
         /// </summary>
         /// <param name="logEvent">LogEvent with culture</param>
         /// <param name="layoutCulture">Culture in on Layout level</param>
@@ -241,10 +235,10 @@ namespace NLog.LayoutRenderers
         /// Register a custom layout renderer.
         /// </summary>
         /// <remarks>Short-cut for registering to default <see cref="ConfigurationItemFactory"/></remarks>
-        /// <typeparam name="T"> Type of the layout renderer.</typeparam>
-        /// <param name="name"> Name of the layout renderer - without ${}.</param>
+        /// <typeparam name="T">Type of the layout renderer.</typeparam>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         public static void Register<T>(string name)
-            where T: LayoutRenderer
+            where T : LayoutRenderer
         {
             var layoutRendererType = typeof(T);
             Register(name, layoutRendererType);
@@ -255,7 +249,7 @@ namespace NLog.LayoutRenderers
         /// </summary>
         /// <remarks>Short-cut for registering to default <see cref="ConfigurationItemFactory"/></remarks>
         /// <param name="layoutRendererType"> Type of the layout renderer.</param>
-        /// <param name="name"> Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         public static void Register(string name, Type layoutRendererType)
         {
             ConfigurationItemFactory.Default.LayoutRenderers
@@ -265,7 +259,7 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Register a custom layout renderer with a callback function <paramref name="func"/>. The callback receives the logEvent.
         /// </summary>
-        /// <param name="name">Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         /// <param name="func">Callback that returns the value for the layout renderer.</param>
         public static void Register(string name, Func<LogEventInfo, object> func)
         {
@@ -275,23 +269,30 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Register a custom layout renderer with a callback function <paramref name="func"/>. The callback receives the logEvent and the current configuration.
         /// </summary>
-        /// <param name="name">Name of the layout renderer - without ${}.</param>
+        /// <param name="name">The layout-renderer type-alias for use in NLog configuration - without '${ }'</param>
         /// <param name="func">Callback that returns the value for the layout renderer.</param>
         public static void Register(string name, Func<LogEventInfo, LoggingConfiguration, object> func)
         {
             var layoutRenderer = new FuncLayoutRenderer(name, func);
-            
-            ConfigurationItemFactory.Default.GetLayoutRenderers().RegisterFuncLayout(name, layoutRenderer);
+
+            Register(layoutRenderer);
         }
 
         /// <summary>
-        /// Resolve from DI
+        /// Register a custom layout renderer with a callback function <paramref name="layoutRenderer"/>. The callback receives the logEvent and the current configuration.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
-        protected T Resolve<T>() where T : class
+        /// <param name="layoutRenderer">Renderer with callback func</param>
+        public static void Register(FuncLayoutRenderer layoutRenderer)
         {
-            return LoggingConfiguration.GetServiceResolver().ResolveService<T>();
+            ConfigurationItemFactory.Default.GetLayoutRenderers().RegisterFuncLayout(layoutRenderer.LayoutRendererName, layoutRenderer);
+        }
+
+        /// <summary>
+        /// Resolves the interface service-type from the service-repository
+        /// </summary>
+        protected T ResolveService<T>() where T : class
+        {
+            return LoggingConfiguration.GetServiceProvider().ResolveService<T>(_isInitialized);
         }
     }
 }

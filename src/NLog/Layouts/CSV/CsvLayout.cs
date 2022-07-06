@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,9 +33,7 @@
 
 namespace NLog.Layouts
 {
-    using System;
     using System.Collections.Generic;
-    using System.ComponentModel;
     using System.Globalization;
     using System.Text;
     using NLog.Config;
@@ -44,10 +42,15 @@ namespace NLog.Layouts
     /// <summary>
     /// A specialized layout that renders CSV-formatted events.
     /// </summary>
-    /// <remarks>If <see cref="LayoutWithHeaderAndFooter.Header"/> is set, then the header generation with column names will be disabled.</remarks>
+    /// <remarks>
+    /// <para>
+    /// If <see cref="LayoutWithHeaderAndFooter.Header"/> is set, then the header generation with column names will be disabled.
+    /// </para>
+    /// <a href="https://github.com/NLog/NLog/wiki/JsonLayout">See NLog Wiki</a>
+    /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/JsonLayout">Documentation on NLog Wiki</seealso>
     [Layout("CsvLayout")]
     [ThreadAgnostic]
-    [ThreadSafe]
     [AppDomainFixedOutput]
     public class CsvLayout : LayoutWithHeaderAndFooter
     {
@@ -61,10 +64,6 @@ namespace NLog.Layouts
         public CsvLayout()
         {
             Columns = new List<CsvColumn>();
-            WithHeader = true;
-            Delimiter = CsvColumnDelimiterMode.Auto;
-            Quoting = CsvQuotingMode.Auto;
-            QuoteChar = "\"";
             Layout = this;
             Header = new CsvHeaderLayout(this);
             Footer = null;
@@ -73,7 +72,7 @@ namespace NLog.Layouts
         /// <summary>
         /// Gets the array of parameters to be passed.
         /// </summary>
-        /// <docgen category='CSV Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [ArrayParameter(typeof(CsvColumn), "column")]
         public IList<CsvColumn> Columns { get; private set; }
 
@@ -81,39 +80,34 @@ namespace NLog.Layouts
         /// Gets or sets a value indicating whether CVS should include header.
         /// </summary>
         /// <value>A value of <c>true</c> if CVS should include header; otherwise, <c>false</c>.</value>
-        /// <docgen category='CSV Options' order='10' />
-        public bool WithHeader { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool WithHeader { get; set; } = true;
 
         /// <summary>
         /// Gets or sets the column delimiter.
         /// </summary>
-        /// <docgen category='CSV Options' order='10' />
-        [DefaultValue("Auto")]
-        public CsvColumnDelimiterMode Delimiter { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public CsvColumnDelimiterMode Delimiter { get; set; } = CsvColumnDelimiterMode.Auto;
 
         /// <summary>
         /// Gets or sets the quoting mode.
         /// </summary>
-        /// <docgen category='CSV Options' order='10' />
-        [DefaultValue("Auto")]
-        public CsvQuotingMode Quoting { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public CsvQuotingMode Quoting { get; set; } = CsvQuotingMode.Auto;
 
         /// <summary>
         /// Gets or sets the quote Character.
         /// </summary>
-        /// <docgen category='CSV Options' order='10' />
-        [DefaultValue("\"")]
-        public string QuoteChar { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public string QuoteChar { get; set; } = "\"";
 
         /// <summary>
         /// Gets or sets the custom column delimiter value (valid when ColumnDelimiter is set to 'Custom').
         /// </summary>
-        /// <docgen category='CSV Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public string CustomColumnDelimiter { get; set; }
 
-        /// <summary>
-        /// Initializes the layout.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeLayout()
         {
             if (!WithHeader)
@@ -163,21 +157,13 @@ namespace NLog.Layouts
             PrecalculateBuilderInternal(logEvent, target);
         }
 
-        /// <summary>
-        /// Formats the log event for write.
-        /// </summary>
-        /// <param name="logEvent">The log event to be formatted.</param>
-        /// <returns>A string representation of the log event.</returns>
+        /// <inheritdoc/>
         protected override string GetFormattedMessage(LogEventInfo logEvent)
         {
             return RenderAllocateBuilder(logEvent);
         }
 
-        /// <summary>
-        /// Formats the log event for write.
-        /// </summary>
-        /// <param name="logEvent">The logging event.</param>
-        /// <param name="target"><see cref="StringBuilder"/> for the result</param>
+        /// <inheritdoc/>
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
             //Memory profiling pointed out that using a foreach-loop was allocating
@@ -202,7 +188,7 @@ namespace NLog.Layouts
             }
 
             int orgLength = target.Length;
-            columnLayout.RenderAppendBuilder(logEvent, target);
+            columnLayout.Render(logEvent, target);
             if (orgLength != target.Length && ColumnValueRequiresQuotes(quoting, target, orgLength))
             {
                 string columnValue = target.ToString(orgLength, target.Length - orgLength);
@@ -265,7 +251,6 @@ namespace NLog.Layouts
         /// Header with column names for CSV layout.
         /// </summary>
         [ThreadAgnostic]
-        [ThreadSafe]
         [AppDomainFixedOutput]
         private class CsvHeaderLayout : Layout
         {
@@ -281,6 +266,7 @@ namespace NLog.Layouts
                 _parent = parent;
             }
 
+            /// <inheritdoc/>
             protected override void InitializeLayout()
             {
                 _headerOutput = null;
@@ -304,31 +290,20 @@ namespace NLog.Layouts
                 // Precalculation and caching is not needed
             }
 
-            /// <summary>
-            /// Renders the layout for the specified logging event by invoking layout renderers.
-            /// </summary>
-            /// <param name="logEvent">The logging event.</param>
-            /// <returns>The rendered layout.</returns>
+            /// <inheritdoc/>
             protected override string GetFormattedMessage(LogEventInfo logEvent)
             {
                 return GetHeaderOutput();
             }
 
-            /// <summary>
-            /// Renders the layout for the specified logging event by invoking layout renderers.
-            /// </summary>
-            /// <param name="logEvent">The logging event.</param>
-            /// <param name="target"><see cref="StringBuilder"/> for the result</param>
+            /// <inheritdoc/>
             protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
             {
                 target.Append(GetHeaderOutput());
             }
         }
 
-        /// <summary>
-        /// Generate description of CSV Layout
-        /// </summary>
-        /// <returns>CSV Layout String Description</returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return ToStringWithNestedItems(Columns, c => c.Name);

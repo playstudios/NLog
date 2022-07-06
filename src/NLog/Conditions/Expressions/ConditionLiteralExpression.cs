@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -54,7 +54,7 @@ namespace NLog.Conditions
         /// Gets the literal value.
         /// </summary>
         /// <value>The literal value.</value>
-        public object LiteralValue { get; private set; }
+        public object LiteralValue { get; }
 
         /// <summary>
         /// Returns a string representation of the expression.
@@ -62,7 +62,7 @@ namespace NLog.Conditions
         /// <returns>The literal value.</returns>
         public override string ToString()
         {
-            if (LiteralValue == null)
+            if (LiteralValue is null)
             {
                 return "null";
             }
@@ -82,7 +82,7 @@ namespace NLog.Conditions
         /// <summary>
         /// Evaluates the expression.
         /// </summary>
-        /// <param name="context">Evaluation context.</param>
+        /// <param name="context">Evaluation context. Ignored.</param>
         /// <returns>The literal value as passed in the constructor.</returns>
         protected override object EvaluateNode(LogEventInfo context)
         {

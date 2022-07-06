@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,14 +42,17 @@ namespace NLog.Layouts
     /// <summary>
     /// A specialized layout that renders JSON-formatted events.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/NLog/NLog/wiki/JsonLayout">See NLog Wiki</a>
+    /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/JsonLayout">Documentation on NLog Wiki</seealso>
     [Layout("JsonLayout")]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class JsonLayout : Layout
     {
         private LimitRecursionJsonConvert JsonConverter
         {
-            get => _jsonConverter ?? (_jsonConverter = new LimitRecursionJsonConvert(MaxRecursionLimit, ResolveService<IJsonConverter>()));
+            get => _jsonConverter ?? (_jsonConverter = new LimitRecursionJsonConvert(MaxRecursionLimit, EscapeForwardSlash, ResolveService<IJsonConverter>()));
             set => _jsonConverter = value;
         }
         private LimitRecursionJsonConvert _jsonConverter;
@@ -66,11 +69,11 @@ namespace NLog.Layouts
             readonly Targets.DefaultJsonSerializer _serializer;
             readonly Targets.JsonSerializeOptions _serializerOptions;
 
-            public LimitRecursionJsonConvert(int maxRecursionLimit, IJsonConverter converter)
+            public LimitRecursionJsonConvert(int maxRecursionLimit, bool escapeForwardSlash, IJsonConverter converter)
             {
                 _converter = converter;
                 _serializer = converter as Targets.DefaultJsonSerializer;
-                _serializerOptions = new Targets.JsonSerializeOptions() { MaxRecursionLimit = Math.Max(0, maxRecursionLimit) };
+                _serializerOptions = new Targets.JsonSerializeOptions() { MaxRecursionLimit = Math.Max(0, maxRecursionLimit), EscapeForwardSlash = escapeForwardSlash };
             }
 
             public bool SerializeObject(object value, StringBuilder builder)
@@ -81,9 +84,9 @@ namespace NLog.Layouts
                     return _converter.SerializeObject(value, builder);
             }
 
-            public void SerializeObjectNoLimit(object value, StringBuilder builder)
+            public bool SerializeObjectNoLimit(object value, StringBuilder builder)
             {
-                _converter.SerializeObject(value, builder);
+                return _converter.SerializeObject(value, builder);
             }
         }
 
@@ -93,105 +96,119 @@ namespace NLog.Layouts
         public JsonLayout()
         {
             Attributes = new List<JsonAttribute>();
-            RenderEmptyObject = true;
-            IncludeAllProperties = false;
-            ExcludeProperties = new HashSet<string>();
-            MaxRecursionLimit = 1;
+            ExcludeProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
         /// Gets the array of attributes' configurations.
         /// </summary>
-        /// <docgen category='JSON Output' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [ArrayParameter(typeof(JsonAttribute), "attribute")]
         public IList<JsonAttribute> Attributes { get; private set; }
 
         /// <summary>
         /// Gets or sets the option to suppress the extra spaces in the output json
         /// </summary>
-        /// <docgen category='JSON Formating' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='100' />
         public bool SuppressSpaces { get; set; }
 
         /// <summary>
         /// Gets or sets the option to render the empty object value {}
         /// </summary>
-        /// <docgen category='JSON Formating' order='10' />
-        [DefaultValue(true)]
-        public bool RenderEmptyObject { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to include contents of the <see cref="GlobalDiagnosticsContext"/> dictionary.
-        /// </summary>
-        /// <docgen category='JSON Output' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeGdc { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsContext"/> dictionary.
-        /// </summary>
-        /// <docgen category='JSON Output' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeMdc { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsLogicalContext"/> dictionary.
-        /// </summary>
-        /// <docgen category='JSON Output' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeMdlc { get; set; }
+        /// <docgen category='Layout Options' order='100' />
+        public bool RenderEmptyObject { get; set; } = true;
 
         /// <summary>
         /// Gets or sets the option to include all properties from the log event (as JSON)
         /// </summary>
-        /// <docgen category='JSON Output' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeAllProperties { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeEventProperties { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to include contents of the <see cref="GlobalDiagnosticsContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeGdc { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether to include the contents of the <see cref="ScopeContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeScopeProperties { get => _includeScopeProperties ?? (_includeMdlc == true || _includeMdc == true); set => _includeScopeProperties = value; }
+        private bool? _includeScopeProperties;
+
+        /// <summary>
+        /// Gets or sets the option to include all properties from the log event (as JSON)
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        [Obsolete("Replaced by IncludeEventProperties. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool IncludeAllProperties { get => IncludeEventProperties; set => IncludeEventProperties = value; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        [Obsolete("Replaced by IncludeScopeProperties. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool IncludeMdc { get => _includeMdc ?? false; set => _includeMdc = value; }
+        private bool? _includeMdc;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to include contents of the <see cref="MappedDiagnosticsLogicalContext"/> dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        [Obsolete("Replaced by IncludeScopeProperties. Marked obsolete on NLog 5.0")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool IncludeMdlc { get => _includeMdlc ?? false; set => _includeMdlc = value; }
+        private bool? _includeMdlc;
+
+        /// <summary>
+        /// Gets or sets the option to exclude null/empty properties from the log event (as JSON)
+        /// </summary>
+        /// <docgen category='Layout Options' order='100' />
+        public bool ExcludeEmptyProperties { get; set; }
 
         /// <summary>
         /// List of property names to exclude when <see cref="IncludeAllProperties"/> is true
         /// </summary>
-        /// <docgen category='JSON Output' order='10' />
-#if NET3_5
-        public HashSet<string> ExcludeProperties { get; set; }
-#else
+        /// <docgen category='Layout Options' order='100' />
+#if !NET35
         public ISet<string> ExcludeProperties { get; set; }
+#else
+        public HashSet<string> ExcludeProperties { get; set; }        
 #endif
 
         /// <summary>
         /// How far should the JSON serializer follow object references before backing off
         /// </summary>
-        /// <docgen category='JSON Output' order='10' />
-        [DefaultValue(1)]
-        public int MaxRecursionLimit { get; set; }
+        /// <docgen category='Layout Options' order='100' />
+        public int MaxRecursionLimit { get; set; } = 1;
 
         /// <summary>
         /// Should forward slashes be escaped? If true, / will be converted to \/ 
         /// </summary>
-        /// <docgen category='JSON Formating' order='10' />
-        [DefaultValue(true)]    // TODO NLog 5 change to nullable (with default fallback to false)
+        /// <remarks>
+        /// If not set explicitly then the value of the parent will be used as default.
+        /// </remarks>
+        /// <docgen category='Layout Options' order='100' />
         public bool EscapeForwardSlash
         {
-            get => _escapeForwardSlashInternal ?? true;
+            get => _escapeForwardSlashInternal ?? false;
             set => _escapeForwardSlashInternal = value;
         }
         private bool? _escapeForwardSlashInternal;
 
-        /// <summary>
-        /// Initializes the layout.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeLayout()
         {
             base.InitializeLayout();
-            if (IncludeMdc)
+
+            if (IncludeScopeProperties)
             {
                 ThreadAgnostic = false;
             }
-            if (IncludeMdlc)
-            {
-                ThreadAgnostic = false;
-            }
-            if (IncludeAllProperties)
+            if (IncludeEventProperties)
             {
                 MutableUnsafe = true;
             }
@@ -200,17 +217,15 @@ namespace NLog.Layouts
             {
                 foreach (var attribute in Attributes)
                 {
-                    if (!attribute.LayoutWrapper.EscapeForwardSlashInternal.HasValue)
+                    if (!attribute.EscapeForwardSlashInternal.HasValue)
                     {
-                        attribute.LayoutWrapper.EscapeForwardSlashInternal = _escapeForwardSlashInternal.Value;
+                        attribute.EscapeForwardSlash = _escapeForwardSlashInternal.Value;
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Closes the layout.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void CloseLayout()
         {
             JsonConverter = null;
@@ -223,26 +238,18 @@ namespace NLog.Layouts
             PrecalculateBuilderInternal(logEvent, target);
         }
 
-        /// <summary>
-        /// Formats the log event as a JSON document for writing.
-        /// </summary>
-        /// <param name="logEvent">The logging event.</param>
-        /// <param name="target"><see cref="StringBuilder"/> for the result</param>
+        /// <inheritdoc/>
         protected override void RenderFormattedMessage(LogEventInfo logEvent, StringBuilder target)
         {
             int orgLength = target.Length;
             RenderJsonFormattedMessage(logEvent, target);
             if (target.Length == orgLength && RenderEmptyObject)
             {
-                target.Append(SuppressSpaces ? "{}" : "{  }");
+                target.Append(SuppressSpaces ? "{}" : "{ }");
             }
         }
 
-        /// <summary>
-        /// Formats the log event as a JSON document for writing.
-        /// </summary>
-        /// <param name="logEvent">The log event to be formatted.</param>
-        /// <returns>A JSON string representation of the log event.</returns>
+        /// <inheritdoc/>
         protected override string GetFormattedMessage(LogEventInfo logEvent)
         {
             return RenderAllocateBuilder(logEvent);
@@ -264,40 +271,40 @@ namespace NLog.Layouts
                 }
             }
 
-            if(IncludeGdc)
+            if (IncludeGdc)
             {
-                foreach (string key in GlobalDiagnosticsContext.GetNames())
+                var gdcKeys = GlobalDiagnosticsContext.GetNames();
+                if (gdcKeys.Count > 0)
                 {
-                    if (string.IsNullOrEmpty(key))
-                        continue;
-                    object propertyValue = GlobalDiagnosticsContext.GetObject(key);
-                    AppendJsonPropertyValue(key, propertyValue, null, null, MessageTemplates.CaptureType.Unknown, sb, sb.Length == orgLength);
+                    foreach (string key in gdcKeys)
+                    {
+                        if (string.IsNullOrEmpty(key))
+                            continue;
+                        object propertyValue = GlobalDiagnosticsContext.GetObject(key);
+                        AppendJsonPropertyValue(key, propertyValue, null, null, MessageTemplates.CaptureType.Unknown, sb, sb.Length == orgLength);
+                    }
                 }
             }
 
-            if (IncludeMdc)
+            if (IncludeScopeProperties)
             {
-                foreach (string key in MappedDiagnosticsContext.GetNames())
+                using (var scopeEnumerator = ScopeContext.GetAllPropertiesEnumerator())
                 {
-                    if (string.IsNullOrEmpty(key))
-                        continue;
-                    object propertyValue = MappedDiagnosticsContext.GetObject(key);
-                    AppendJsonPropertyValue(key, propertyValue, null, null, MessageTemplates.CaptureType.Unknown, sb, sb.Length == orgLength);
+                    while (scopeEnumerator.MoveNext())
+                    {
+                        var scopeProperty = scopeEnumerator.Current;
+                        if (string.IsNullOrEmpty(scopeProperty.Key))
+                            continue;
+
+                        if (ExcludeProperties.Contains(scopeProperty.Key))
+                            continue;
+
+                        AppendJsonPropertyValue(scopeProperty.Key, scopeProperty.Value, null, null, MessageTemplates.CaptureType.Unknown, sb, sb.Length == orgLength);
+                    }
                 }
             }
 
-            if (IncludeMdlc)
-            {
-                foreach (string key in MappedDiagnosticsLogicalContext.GetNames())
-                {
-                    if (string.IsNullOrEmpty(key))
-                        continue;
-                    object propertyValue = MappedDiagnosticsLogicalContext.GetObject(key);
-                    AppendJsonPropertyValue(key, propertyValue, null, null, MessageTemplates.CaptureType.Unknown, sb, sb.Length == orgLength);
-                }
-            }
-
-            if (IncludeAllProperties && logEvent.HasProperties)
+            if (IncludeEventProperties && logEvent.HasProperties)
             {
                 IEnumerable<MessageTemplates.MessageTemplateParameter> propertiesList = logEvent.CreateOrUpdatePropertiesInternal(true);
                 foreach (var prop in propertiesList)
@@ -316,25 +323,23 @@ namespace NLog.Layouts
                 CompleteJsonMessage(sb);
         }
 
-        private void BeginJsonProperty(StringBuilder sb, string propName, bool beginJsonMessage)
+        private void BeginJsonProperty(StringBuilder sb, string propName, bool beginJsonMessage, bool ensureStringEscape)
         {
             if (beginJsonMessage)
             {
-                sb.Append(SuppressSpaces ? "{" : "{ ");
+                sb.Append(SuppressSpaces ? "{\"" : "{ \"");
             }
             else
             {
-                sb.Append(',');
-                if (!SuppressSpaces)
-                    sb.Append(' ');
+                sb.Append(SuppressSpaces ? ",\"" : ", \"");
             }
 
-            sb.Append('"');
-            sb.Append(propName);
-            sb.Append('"');
-            sb.Append(':');
-            if (!SuppressSpaces)
-                sb.Append(' ');
+            if (ensureStringEscape)
+                Targets.DefaultJsonSerializer.AppendStringEscape(sb, propName, false, false);
+            else
+                sb.Append(propName);
+
+            sb.Append(SuppressSpaces ? "\":" : "\": ");
         }
 
         private void CompleteJsonMessage(StringBuilder sb)
@@ -344,11 +349,20 @@ namespace NLog.Layouts
 
         private void AppendJsonPropertyValue(string propName, object propertyValue, string format, IFormatProvider formatProvider, MessageTemplates.CaptureType captureType, StringBuilder sb, bool beginJsonMessage)
         {
-            BeginJsonProperty(sb, propName, beginJsonMessage);
+            if (ExcludeEmptyProperties && propertyValue is null)
+                return;
+
+            var initialLength = sb.Length;
+
+            BeginJsonProperty(sb, propName, beginJsonMessage, true);
             if (MaxRecursionLimit <= 1 && captureType == MessageTemplates.CaptureType.Serialize)
             {
                 // Overrides MaxRecursionLimit as message-template tells us it is safe
-                JsonConverter.SerializeObjectNoLimit(propertyValue, sb);
+                if (!JsonConverter.SerializeObjectNoLimit(propertyValue, sb))
+                {
+                    sb.Length = initialLength;
+                    return;
+                }
             }
             else if (captureType == MessageTemplates.CaptureType.Stringify)
             {
@@ -359,7 +373,16 @@ namespace NLog.Layouts
             }
             else
             {
-                JsonConverter.SerializeObject(propertyValue, sb);
+                if (!JsonConverter.SerializeObject(propertyValue, sb))
+                {
+                    sb.Length = initialLength;
+                    return;
+                }
+            }
+
+            if (ExcludeEmptyProperties && (sb[sb.Length-1] == '"' && sb[sb.Length-2] == '"'))
+            {
+                sb.Length = initialLength;
             }
         }
 
@@ -384,29 +407,17 @@ namespace NLog.Layouts
 
         private bool RenderAppendJsonPropertyValue(JsonAttribute attrib, LogEventInfo logEvent, StringBuilder sb, bool beginJsonMessage)
         {
-            BeginJsonProperty(sb, attrib.Name, beginJsonMessage);
-            if (attrib.Encode)
-            {
-                // "\"{0}\":{1}\"{2}\""
-                sb.Append('"');
-            }
-            int beforeValueLength = sb.Length;
-            attrib.LayoutWrapper.RenderAppendBuilder(logEvent, sb);
-            if (!attrib.IncludeEmptyValue && beforeValueLength == sb.Length)
+            BeginJsonProperty(sb, attrib.Name, beginJsonMessage, false);
+
+            if (!attrib.RenderAppendJsonValue(logEvent, JsonConverter, sb))
             {
                 return false;
             }
-            if (attrib.Encode)
-            {
-                sb.Append('"');
-            }
+
             return true;
         }
 
-        /// <summary>
-        /// Generate description of JSON Layout
-        /// </summary>
-        /// <returns>JSON Layout String Description</returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return ToStringWithNestedItems(Attributes, a => string.Concat(a.Name, "-", a.Layout?.ToString()));

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,15 +31,12 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using NLog.Layouts;
-
 namespace NLog.UnitTests.Internal
 {
-    using NLog.Targets;
-
-    using Xunit;
-    using Xunit.Extensions;
+    using NLog.Layouts;
     using NLog.Internal;
+    using NLog.Targets;
+    using Xunit;
 
     public class FilePathLayoutTests // Not needed as not using NLog-Core -> : NLogTestBase
     {

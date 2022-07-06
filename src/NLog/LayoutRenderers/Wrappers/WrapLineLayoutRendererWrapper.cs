@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,7 +34,6 @@
 namespace NLog.LayoutRenderers.Wrappers
 {
     using System;
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
 
@@ -42,35 +41,21 @@ namespace NLog.LayoutRenderers.Wrappers
     /// Replaces newline characters from the result of another layout renderer with spaces.
     /// </summary>
     [LayoutRenderer("wrapline")]
-    [AmbientProperty("WrapLine")]
+    [AmbientProperty(nameof(WrapLine))]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public sealed class WrapLineLayoutRendererWrapper : WrapperLayoutRendererBase
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="WrapLineLayoutRendererWrapper" /> class.
-        /// </summary>
-        public WrapLineLayoutRendererWrapper()
-        {
-            WrapLine = 80;
-        }
-
         /// <summary>
         /// Gets or sets the line length for wrapping.
         /// </summary>
         /// <remarks>
         /// Only positive values are allowed
         /// </remarks>
-        /// <docgen category='Transformation Options' order='10' />
-        [DefaultValue(80)]
-        public int WrapLine { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public int WrapLine { get; set; } = 80;
 
-        /// <summary>
-        /// Post-processes the rendered message. 
-        /// </summary>
-        /// <param name="text">The text to be post-processed.</param>
-        /// <returns>Post-processed text.</returns>
+        /// <inheritdoc/>
         protected override string Transform(string text)
         {
             if (WrapLine <= 0)

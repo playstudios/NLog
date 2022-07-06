@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -135,7 +135,7 @@ namespace NLog.Config
 
         internal void ReloadConfigOnTimer(object state)
         {
-            if (_reloadTimer == null && _isDisposing)
+            if (_reloadTimer is null && _isDisposing)
             {
                 return; //timer was disposed already. 
             }
@@ -169,17 +169,24 @@ namespace NLog.Config
                         return;
                     }
 
-                    newConfig = oldConfig.ReloadNewConfig();
-                    if (newConfig == null || ReferenceEquals(newConfig, oldConfig))
+                    newConfig = oldConfig.Reload();
+                    if (ReferenceEquals(newConfig, oldConfig))
                         return;
+
+                    if (newConfig is IInitializeSucceeded config2 && config2.InitializeSucceeded != true)
+                    {
+                        InternalLogger.Warn("NLog Config Reload() failed. Invalid XML?");
+                        return;
+                    }
                 }
                 catch (Exception exception)
                 {
+#if DEBUG
                     if (exception.MustBeRethrownImmediately())
                     {
                         throw;  // Throwing exceptions here will crash the entire application (.NET 2.0 behavior)
                     }
-
+#endif
                     InternalLogger.Warn(exception, "NLog configuration failed to reload");
                     _logFactory?.NotifyConfigurationReloaded(new LoggingConfigurationReloadedEventArgs(false, exception));
                     return;
@@ -195,11 +202,12 @@ namespace NLog.Config
                 }
                 catch (Exception exception)
                 {
+#if DEBUG
                     if (exception.MustBeRethrownImmediately())
                     {
                         throw;  // Throwing exceptions here will crash the entire application (.NET 2.0 behavior)
                     }
-
+#endif
                     InternalLogger.Warn(exception, "NLog configuration reloaded, failed to be assigned");
                     _watcher.Watch(oldConfig.FileNamesToWatch);
                     _logFactory?.NotifyConfigurationReloaded(new LoggingConfigurationReloadedEventArgs(false, exception));
@@ -223,7 +231,7 @@ namespace NLog.Config
                     return;
                 }
 
-                if (_reloadTimer == null)
+                if (_reloadTimer is null)
                 {
                     var configuration = _logFactory._config;
                     if (configuration != null)
@@ -251,7 +259,7 @@ namespace NLog.Config
                 var fileNamesToWatch = config.FileNamesToWatch?.ToList();
                 if (fileNamesToWatch?.Count > 0)
                 {
-                    if (_watcher == null)
+                    if (_watcher is null)
                     {
                         _watcher = new MultiFileWatcher();
                         _watcher.FileChanged += ConfigFileChanged;

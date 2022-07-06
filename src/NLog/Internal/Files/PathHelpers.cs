@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -70,7 +70,11 @@ namespace NLog.Internal
         /// <returns>never null</returns>
         public static string TrimDirectorySeparators(string path)
         {
-            return path?.TrimEnd(DirectorySeparatorChars) ?? string.Empty;
+            var newpath = path?.TrimEnd(DirectorySeparatorChars) ?? string.Empty;
+            if (newpath.EndsWith(":", System.StringComparison.Ordinal))
+                return path;    // Support root-path on Windows (But Linux root-path is off limits)
+            else
+                return newpath;
         }
 
         public static bool IsTempDir(string directory, string tempDir)
@@ -86,7 +90,7 @@ namespace NLog.Internal
             if (fullpath.StartsWith(tempDir, System.StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            if (tempDir.StartsWith("/tmp") && directory.StartsWith("/var/tmp/"))
+            if (tempDir.StartsWith("/tmp", System.StringComparison.Ordinal) && directory.StartsWith("/var/tmp/", System.StringComparison.Ordinal))
                 return true;    // Microsoft has made a funny joke on Linux. Path.GetTempPath() uses /tmp/ as fallback, but single-publish uses /var/tmp/ as first fallback
 
             return false;

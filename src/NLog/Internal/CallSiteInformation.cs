@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -124,7 +124,7 @@ namespace NLog.Internal
             }
 
             method = method ?? GetCallerStackFrameMethod(0);
-            if (method == null)
+            if (method is null)
                 return string.Empty;
 
             cleanAsyncMoveNext = cleanAsyncMoveNext || UserStackFrameNumberLegacy.HasValue;
@@ -138,7 +138,7 @@ namespace NLog.Internal
                 return CallerMethodName;
 
             method = method ?? GetCallerStackFrameMethod(0);
-            if (method == null)
+            if (method is null)
                 return string.Empty;
 
             cleanAsyncMoveNext = cleanAsyncMoveNext || UserStackFrameNumberLegacy.HasValue;
@@ -177,7 +177,7 @@ namespace NLog.Internal
         /// <returns>Index of the first user stack frame or 0 if all stack frames are non-user</returns>
         private static int? FindCallingMethodOnStackTrace(StackFrame[] stackFrames, Type loggerType)
         {
-            if (stackFrames == null || stackFrames.Length == 0)
+            if (stackFrames is null || stackFrames.Length == 0)
                 return null;
 
             int? firstStackFrameAfterLogger = null;
@@ -211,7 +211,7 @@ namespace NLog.Internal
         /// <param name="firstUserStackFrame">Starting point for skipping async MoveNext-frames</param>
         private static int SkipToUserStackFrameLegacy(StackFrame[] stackFrames, int firstUserStackFrame)
         {
-#if NET4_5
+#if !NET35 && !NET40
             for (int i = firstUserStackFrame; i < stackFrames.Length; ++i)
             {
                 var stackFrame = stackFrames[i];
@@ -243,7 +243,7 @@ namespace NLog.Internal
         private static bool SkipAssembly(StackFrame frame)
         {
             var assembly = StackTraceUsageUtils.LookupAssemblyFromStackFrame(frame);
-            return assembly == null || LogManager.IsHiddenAssembly(assembly);
+            return assembly is null || LogManager.IsHiddenAssembly(assembly);
         }
 
         /// <summary>

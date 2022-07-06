@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -34,29 +34,27 @@
 namespace NLog.Targets
 {
     using System.Collections.Generic;
-    using System.ComponentModel;
 
     /// <summary>
-    /// Writes log messages to an ArrayList in memory for programmatic retrieval.
+    /// Writes log messages to <see cref="Logs"/> in memory for programmatic retrieval.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/Memory-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/Memory-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Memory/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/Memory/Simple/Example.cs" />
     /// </example>
     [Target("Memory")]
-    public sealed class MemoryTarget : TargetWithLayout
+    public sealed class MemoryTarget : TargetWithLayoutHeaderAndFooter
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryTarget" /> class.
@@ -67,7 +65,6 @@ namespace NLog.Targets
         public MemoryTarget()
         {
             Logs = new List<string>();
-            OptimizeBufferReuse = true;
         }
 
         /// <summary>
@@ -91,11 +88,32 @@ namespace NLog.Targets
         /// Gets or sets the max number of items to have in memory
         /// </summary>
         /// <docgen category='Buffering Options' order='10' />
-        [DefaultValue(0)]
         public int MaxLogsCount { get; set; }
 
+        /// <inheritdoc/>
+        protected override void InitializeTarget()
+        {
+            base.InitializeTarget();
+
+            if (Header != null)
+            {
+                Logs.Add(RenderLogEvent(Header, LogEventInfo.CreateNullEvent()));
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void CloseTarget()
+        {
+            if (Footer != null)
+            {
+                Logs.Add(RenderLogEvent(Footer, LogEventInfo.CreateNullEvent()));
+            }
+
+            base.CloseTarget();
+        }
+
         /// <summary>
-        /// Renders the logging event message and adds it to the internal ArrayList of log messages.
+        /// Renders the logging event message and adds to <see cref="Logs"/>
         /// </summary>
         /// <param name="logEvent">The logging event.</param>
         protected override void Write(LogEventInfo logEvent)

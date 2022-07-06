@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,9 +42,8 @@ namespace NLog.UnitTests.LayoutRenderers.Wrappers
         [Fact]
         public void XmlEncodeTest1()
         {
-            MappedDiagnosticsContext.Clear();
-            MappedDiagnosticsContext.Set("foo", " abc<>&'\"def ");
-            SimpleLayout l = "${xml-encode:${mdc:foo}}";
+            ScopeContext.PushProperty("foo", " abc<>&'\"def ");
+            SimpleLayout l = "${xml-encode:${scopeproperty:foo}}";
 
             Assert.Equal(" abc&lt;&gt;&amp;&apos;&quot;def ", l.Render(LogEventInfo.CreateNullEvent()));
         }

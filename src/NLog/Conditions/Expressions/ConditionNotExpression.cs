@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -51,24 +51,17 @@ namespace NLog.Conditions
         /// Gets the expression to be negated.
         /// </summary>
         /// <value>The expression.</value>
-        public ConditionExpression Expression { get; private set; }
+        public ConditionExpression Expression { get; }
 
         /// <summary>
         /// Returns a string representation of the expression.
         /// </summary>
-        /// <returns>
-        /// A <see cref="T:System.String"/> that represents the condition expression.
-        /// </returns>
         public override string ToString()
         {
             return $"(not {Expression})";
         }
 
-        /// <summary>
-        /// Evaluates the expression.
-        /// </summary>
-        /// <param name="context">Evaluation context.</param>
-        /// <returns>Expression result.</returns>
+        /// <inheritdoc/>
         protected override object EvaluateNode(LogEventInfo context)
         {
             return (bool)Expression.Evaluate(context) ? BoxedFalse : BoxedTrue;

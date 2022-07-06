@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,47 +42,38 @@ namespace NLog.Targets
     /// <summary>
     /// Line ending mode.
     /// </summary>
-#if !NETSTANDARD1_3
     [TypeConverter(typeof(LineEndingModeConverter))]
-#endif
     public sealed class LineEndingMode : IEquatable<LineEndingMode>
     {
         /// <summary>
         /// Insert platform-dependent end-of-line sequence after each line.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LineEndingMode Default = new LineEndingMode("Default", EnvironmentHelper.NewLine);
 
         /// <summary>
         /// Insert CR LF sequence (ASCII 13, ASCII 10) after each line.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LineEndingMode CRLF = new LineEndingMode("CRLF", "\r\n");
 
         /// <summary>
         /// Insert CR character (ASCII 13) after each line.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LineEndingMode CR = new LineEndingMode("CR", "\r");
 
         /// <summary>
         /// Insert LF character (ASCII 10) after each line.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LineEndingMode LF = new LineEndingMode("LF", "\n");
 
         /// <summary>
         /// Insert null terminator (ASCII 0) after each line.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LineEndingMode Null = new LineEndingMode("Null", "\0");
 
         /// <summary>
         /// Do not insert any line ending.
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes", Justification = "Type is immutable")]
         public static readonly LineEndingMode None = new LineEndingMode("None", string.Empty);
-
 
         private readonly string _name;
         private readonly string _newLineCharacters;
@@ -122,7 +113,7 @@ namespace NLog.Targets
         /// <exception cref="ArgumentOutOfRangeException">There is no line ending mode with the specified name.</exception>
         public static LineEndingMode FromString([NotNull] string name)
         {
-            if (name == null) throw new ArgumentNullException(nameof(name));
+            if (name is null) throw new ArgumentNullException(nameof(name));
 
             if (name.Equals(CRLF.Name, StringComparison.OrdinalIgnoreCase)) return CRLF;
             if (name.Equals(LF.Name, StringComparison.OrdinalIgnoreCase)) return LF;
@@ -143,12 +134,12 @@ namespace NLog.Targets
         /// <returns>The value of <c>mode1.NewLineCharacters == mode2.NewLineCharacters</c>.</returns>
         public static bool operator ==(LineEndingMode mode1, LineEndingMode mode2)
         {
-            if (ReferenceEquals(mode1, null))
+            if (mode1 is null)
             {
-                return ReferenceEquals(mode2, null);
+                return mode2 is null;
             }
 
-            if (ReferenceEquals(mode2, null))
+            if (mode2 is null)
             {
                 return false;
             }
@@ -165,12 +156,12 @@ namespace NLog.Targets
         /// <returns>The value of <c>mode1.NewLineCharacters != mode2.NewLineCharacters</c>.</returns>
         public static bool operator !=(LineEndingMode mode1, LineEndingMode mode2)
         {
-            if (ReferenceEquals(mode1, null))
+            if (mode1 is null)
             {
-                return !ReferenceEquals(mode2, null);
+                return !(mode2 is null);
             }
 
-            if (ReferenceEquals(mode2, null))
+            if (mode2 is null)
             {
                 return true;
             }
@@ -178,44 +169,21 @@ namespace NLog.Targets
             return mode1.NewLineCharacters != mode2.NewLineCharacters;
         }
 
-        /// <summary>
-        /// Returns a string representation of the log level.
-        /// </summary>
-        /// <returns>Log level name.</returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
             return Name;
         }
 
-        /// <summary>
-        /// Returns a hash code for this instance.
-        /// </summary>
-        /// <returns>
-        /// A hash code for this instance, suitable for use in hashing algorithms 
-        /// and data structures like a hash table. 
-        /// </returns>
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
-            return (_newLineCharacters != null ? _newLineCharacters.GetHashCode() : 0);
+            return _newLineCharacters?.GetHashCode() ?? 0;
         }
 
-        /// <summary>
-        /// Determines whether the specified <see cref="System.Object"/> is 
-        /// equal to this instance.
-        /// </summary>
-        /// <param name="obj">The <see cref="System.Object"/> to compare with 
-        /// this instance.</param>
-        /// <returns>
-        /// Value of <c>true</c> if the specified <see cref="System.Object"/> 
-        /// is equal to this instance; otherwise, <c>false</c>.
-        /// </returns>
-        /// <exception cref="T:System.NullReferenceException">
-        /// The <paramref name="obj"/> parameter is null.
-        /// </exception>
+        /// <inheritdoc/>
         public override bool Equals(object obj)
         {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
             return obj is LineEndingMode mode && Equals(mode);
         }
 
@@ -224,42 +192,26 @@ namespace NLog.Targets
         /// <param name="other">An object to compare with this object.</param>
         public bool Equals(LineEndingMode other)
         {
-            if (ReferenceEquals(null, other)) return false;
-            if (ReferenceEquals(this, other)) return true;
-            return string.Equals(_newLineCharacters, other._newLineCharacters);
+            return ReferenceEquals(this, other) || string.Equals(_newLineCharacters, other?._newLineCharacters, StringComparison.Ordinal);
         }
 
-#if !NETSTANDARD1_3
         /// <summary>
         /// Provides a type converter to convert <see cref="LineEndingMode"/> objects to and from other representations.
         /// </summary>
         public class LineEndingModeConverter : TypeConverter
         {
-            /// <summary>
-            /// Returns whether this converter can convert an object of the given type to the type of this converter, using the specified context.
-            /// </summary>
-            /// <returns>
-            /// true if this converter can perform the conversion; otherwise, false.
-            /// </returns>
-            /// <param name="context">An <see cref="T:System.ComponentModel.ITypeDescriptorContext"/> that provides a format context. </param><param name="sourceType">A <see cref="T:System.Type"/> that represents the type you want to convert from. </param>
+            /// <inheritdoc/>
             public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
             {
                 return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
             }
 
-            /// <summary>
-            /// Converts the given object to the type of this converter, using the specified context and culture information.
-            /// </summary>
-            /// <returns>
-            /// An <see cref="T:System.Object"/> that represents the converted value.
-            /// </returns>
-            /// <param name="context">An <see cref="T:System.ComponentModel.ITypeDescriptorContext"/> that provides a format context. </param><param name="culture">The <see cref="T:System.Globalization.CultureInfo"/> to use as the current culture. </param><param name="value">The <see cref="T:System.Object"/> to convert. </param><exception cref="T:System.NotSupportedException">The conversion cannot be performed. </exception>
+            /// <inheritdoc/>
             public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
             {
                 var name = value as string;
                 return name != null ? FromString(name) : base.ConvertFrom(context, culture, value);
             }
         }
-#endif
     }
 }

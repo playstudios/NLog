@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,12 +41,12 @@ namespace NLog.MessageTemplates
         /// <summary>
         /// Constructor
         /// </summary>
-        public Hole(string name, string format, CaptureType captureType, short position, short alignment)
+        public Hole(string name, string format, CaptureType captureType, short parameterIndex, short alignment)
         {
             Name = name;
             Format = format;
             CaptureType = captureType;
-            Index = position;
+            Index = parameterIndex;
             Alignment = alignment;
         }
 

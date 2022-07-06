@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,16 +36,15 @@ namespace NLog.LayoutRenderers
     using System;
     using System.Text;
     using System.Collections.Generic;
-    using System.ComponentModel;
     using NLog.Config;
     using NLog.Internal;
+    using System.Globalization;
 
     /// <summary>
     /// Log event context data.
     /// </summary>
     [LayoutRenderer("all-event-properties")]
     [ThreadAgnostic]
-    [ThreadSafe]
     [MutableUnsafe]
     public class AllEventPropertiesLayoutRenderer : LayoutRenderer
     {
@@ -61,15 +60,13 @@ namespace NLog.LayoutRenderers
         {
             Separator = ", ";
             Format = "[key]=[value]";
-            Exclude = new HashSet<string>(
-                ArrayHelper.Empty<string>(),
-                StringComparer.OrdinalIgnoreCase);
+            Exclude = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
         /// Gets or sets string that will be used to separate key/value pairs.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public string Separator { get; set; }
 
         /// <summary>
@@ -77,24 +74,36 @@ namespace NLog.LayoutRenderers
         ///
         /// A value is empty when null or in case of a string, null or empty string.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
-        public bool IncludeEmptyValues { get; set; } = false;
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeEmptyValues { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether to include the contents of the <see cref="ScopeContext"/> properties-dictionary.
+        /// </summary>
+        /// <docgen category='Layout Options' order='10' />
+        public bool IncludeScopeProperties { get; set; }
 
         /// <summary>
         /// Gets or sets the keys to exclude from the output. If omitted, none are excluded.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-#if NET3_5
-        public HashSet<string> Exclude { get; set; }
-#else
+        /// <docgen category='Layout Options' order='10' />
+#if !NET35
         public ISet<string> Exclude { get; set; }
+#else
+        public HashSet<string> Exclude { get; set; }   
 #endif
+
+        /// <summary>
+        /// Enables capture of ScopeContext-properties from active thread context
+        /// </summary>
+        [NLogConfigurationIgnoreProperty]
+        public LayoutRenderer FixScopeContext => IncludeScopeProperties ? _fixScopeContext : null;
+        private static readonly LayoutRenderer _fixScopeContext = new ScopeContextPropertyLayoutRenderer() { Item = string.Empty };
 
         /// <summary>
         /// Gets or sets how key/value pairs will be formatted.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         public string Format
         {
             get => _format;
@@ -125,52 +134,81 @@ namespace NLog.LayoutRenderers
         }
 
         /// <summary>
-        /// Renders all log event's properties and appends them to the specified <see cref="StringBuilder" />.
+        /// Gets or sets the culture used for rendering. 
         /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <docgen category='Layout Options' order='100' />
+        public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
+
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
-            if (!logEvent.HasProperties)
+            if (!logEvent.HasProperties && !IncludeScopeProperties)
                 return;
 
-            var formatProvider = GetFormatProvider(logEvent);
+            var formatProvider = GetFormatProvider(logEvent, Culture);
             bool checkForExclude = Exclude?.Count > 0;
-            bool nonStandardFormat = _beforeKey == null || _afterKey == null || _afterValue == null;
+            bool nonStandardFormat = _beforeKey is null || _afterKey is null || _afterValue is null;
 
-            bool first = true;
-            foreach (var property in logEvent.Properties)
+            bool includeSeparator = false;
+            if (logEvent.HasProperties)
             {
-                if (!IncludeEmptyValues && IsEmptyPropertyValue(property.Value))
-                    continue;
-
-                if (checkForExclude && property.Key is string propertyKey && Exclude.Contains(propertyKey))
-                    continue;
-
-                if (!first)
+                IEnumerable<MessageTemplates.MessageTemplateParameter> propertiesList = logEvent.CreateOrUpdatePropertiesInternal(true);
+                foreach (var property in propertiesList)
                 {
-                    builder.Append(Separator);
-                }
-
-                first = false;
-
-                if (nonStandardFormat)
-                {
-                    var key = Convert.ToString(property.Key, formatProvider);
-                    var value = Convert.ToString(property.Value, formatProvider);
-                    var pair = Format.Replace("[key]", key)
-                                     .Replace("[value]", value);
-                    builder.Append(pair);
-                }
-                else
-                {
-                    builder.Append(_beforeKey);
-                    builder.AppendFormattedValue(property.Key, null, formatProvider, ValueFormatter);
-                    builder.Append(_afterKey);
-                    builder.AppendFormattedValue(property.Value, null, formatProvider, ValueFormatter);
-                    builder.Append(_afterValue);
+                    if (AppendProperty(builder, property.Name, property.Value, property.Format, formatProvider, includeSeparator, checkForExclude, nonStandardFormat))
+                    {
+                        includeSeparator = true;
+                    }
                 }
             }
+
+            if (IncludeScopeProperties)
+            {
+                using (var scopeEnumerator = ScopeContext.GetAllPropertiesEnumerator())
+                {
+                    while (scopeEnumerator.MoveNext())
+                    {
+                        var property = scopeEnumerator.Current;
+                        if (AppendProperty(builder, property.Key, property.Value, null, formatProvider, includeSeparator, checkForExclude, nonStandardFormat))
+                        {
+                            includeSeparator = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool AppendProperty(StringBuilder builder, object propertyKey, object propertyValue, string propertyFormat, IFormatProvider formatProvider, bool includeSeparator, bool checkForExclude, bool nonStandardFormat)
+        {
+            if (!IncludeEmptyValues && IsEmptyPropertyValue(propertyValue))
+                return false;
+
+            if (checkForExclude && Exclude.Contains(propertyKey as string ?? string.Empty))
+                return false;
+
+            if (includeSeparator)
+            {
+                builder.Append(Separator);
+            }
+
+            if (nonStandardFormat)
+            {
+                var key = Convert.ToString(propertyKey, formatProvider);
+                var value = Convert.ToString(propertyValue, formatProvider);
+                var pair = Format.Replace("[key]", key)
+                                 .Replace("[value]", value);
+                builder.Append(pair);
+            }
+            else
+            {
+                builder.Append(_beforeKey);
+                builder.AppendFormattedValue(propertyKey, null, formatProvider, ValueFormatter);
+                builder.Append(_afterKey);
+                builder.AppendFormattedValue(propertyValue, propertyFormat, formatProvider, ValueFormatter);
+                builder.Append(_afterValue);
+            }
+
+            return true;
         }
 
         private static bool IsEmptyPropertyValue(object value)
@@ -180,7 +218,7 @@ namespace NLog.LayoutRenderers
                 return string.IsNullOrEmpty(s);
             }
 
-            return value == null;
+            return value is null;
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,49 +35,34 @@ namespace NLog.LayoutRenderers
 {
     using System;
     using System.Text;
-    using NLog.Config;
 
     /// <summary>
     /// Render a Nested Diagnostic Context item.
     /// See <see cref="NestedDiagnosticsContext"/>
     /// </summary>
     [LayoutRenderer("ndc")]
-    [ThreadSafe]
+    [Obsolete("Replaced by ScopeContextNestedStatesLayoutRenderer ${scopenested}. Marked obsolete on NLog 5.0")]
     public class NdcLayoutRenderer : LayoutRenderer
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="NdcLayoutRenderer" /> class.
-        /// </summary>
-        public NdcLayoutRenderer()
-        {
-            Separator = " ";
-            BottomFrames = -1;
-            TopFrames = -1;
-        }
-
-        /// <summary>
         /// Gets or sets the number of top stack frames to be rendered.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        public int TopFrames { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public int TopFrames { get; set; } = -1;
 
         /// <summary>
         /// Gets or sets the number of bottom stack frames to be rendered.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        public int BottomFrames { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public int BottomFrames { get; set; } = -1;
 
         /// <summary>
         /// Gets or sets the separator to be used for concatenating nested diagnostics context output.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        public string Separator { get; set; }
+        /// <docgen category='Layout Options' order='10' />
+        public string Separator { get; set; } = " ";
 
-        /// <summary>
-        /// Renders the specified Nested Diagnostics Context item and appends it to the specified <see cref="StringBuilder" />.
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             if (TopFrames == 1)

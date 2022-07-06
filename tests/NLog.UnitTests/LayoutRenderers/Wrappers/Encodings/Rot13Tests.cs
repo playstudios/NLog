@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -30,8 +30,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
-
-using NLog.Config;
 
 namespace NLog.UnitTests.LayoutRenderers
 {
@@ -81,25 +79,27 @@ namespace NLog.UnitTests.LayoutRenderers
         [Fact]
         public void Test5()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
                 <nlog>
                     <targets>
                         <target name='debug' type='Debug' layout='${rot13:${mdc:A}}' />
-                        <target name='debug2' type='Debug' layout='${rot13:${rot13:${mdc:A}}}' />
+                        <target name='debug2' type='Debug' layout='${rot13:${rot13:${scopeproperty:A}}}' />
                      </targets>
                     <rules>
                         <logger name='*' levels='Trace' writeTo='debug,debug2' />
                     </rules>
-                </nlog>");
+                </nlog>").LogFactory;
 
-            MappedDiagnosticsContext.Set("A", "Foo.Bar!");
-            ILogger l = LogManager.GetLogger("NLog.UnitTests.LayoutRenderers.Rot13Tests");
-            l.Trace("aaa");
+            var logger = logFactory.GetLogger("NLog.UnitTests.LayoutRenderers.Rot13Tests");
+            using (logger.PushScopeProperty("A", "Foo.Bar!"))
+            {
+                logger.Trace("aaa");
+            }
 
-            AssertDebugLastMessage("debug", "Sbb.One!");
+            logFactory.AssertDebugLastMessage("Debug", "Sbb.One!");
 
             // double rot-13 should be identity
-            AssertDebugLastMessage("debug2", "Foo.Bar!");
+            logFactory.AssertDebugLastMessage("debug2", "Foo.Bar!");
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -83,17 +83,16 @@ namespace NLog.Targets.Wrappers
             {
                 if (_logEventInfoQueue.Count >= RequestLimit)
                 {
-                    InternalLogger.Debug("Async queue is full");
                     switch (OnOverflow)
                     {
                         case AsyncTargetWrapperOverflowAction.Discard:
-                            InternalLogger.Debug("Discarding one element from queue");
+                            InternalLogger.Debug("AsyncQueue - Discarding single item, because queue is full");
                             var lostItem = _logEventInfoQueue.Dequeue();
                             OnLogEventDropped(lostItem.LogEvent);
                             break;
 
                         case AsyncTargetWrapperOverflowAction.Grow:
-                            InternalLogger.Debug("The overflow action is Grow, adding element anyway");
+                            InternalLogger.Debug("AsyncQueue - Growing the size of queue, because queue is full");
                             OnLogEventQueueGrows(RequestCount + 1);
                             RequestLimit *= 2;
                             break;
@@ -101,12 +100,12 @@ namespace NLog.Targets.Wrappers
                         case AsyncTargetWrapperOverflowAction.Block:
                             while (_logEventInfoQueue.Count >= RequestLimit)
                             {
-                                InternalLogger.Debug("Blocking because the overflow action is Block...");
+                                InternalLogger.Debug("AsyncQueue - Blocking until ready, because queue is full");
                                 System.Threading.Monitor.Wait(_logEventInfoQueue);
-                                InternalLogger.Trace("Entered critical section.");
+                                InternalLogger.Trace("AsyncQueue - Entered critical section.");
                             }
 
-                            InternalLogger.Trace("Async queue limit ok.");
+                            InternalLogger.Trace("AsyncQueue - Limit ok.");
                             break;
                     }
                 }
@@ -120,7 +119,7 @@ namespace NLog.Targets.Wrappers
         /// Dequeues a maximum of <c>count</c> items from the queue
         /// and adds returns the list containing them.
         /// </summary>
-        /// <param name="count">Maximum number of items to be dequeued (-1 means everything).</param>
+        /// <param name="count">Maximum number of items to be dequeued</param>
         /// <returns>The array of log events.</returns>
         public override AsyncLogEventInfo[] DequeueBatch(int count)
         {

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,6 +33,7 @@
 
 namespace NLog.LayoutRenderers
 {
+    using System;
     using System.Text;
     using NLog.Config;
     using NLog.Internal;
@@ -41,13 +42,13 @@ namespace NLog.LayoutRenderers
     /// Render a Mapped Diagnostic Context item, See <see cref="MappedDiagnosticsContext"/>
     /// </summary>
     [LayoutRenderer("mdc")]
-    [ThreadSafe]
+    [Obsolete("Replaced by ScopeContextPropertyLayoutRenderer ${scopeproperty}. Marked obsolete on NLog 5.0")]
     public class MdcLayoutRenderer : LayoutRenderer, IStringValueRenderer
     {
         /// <summary>
         /// Gets or sets the name of the item.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [RequiredParameter]
         [DefaultParameter]
         public string Item { get; set; }
@@ -55,10 +56,10 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Format string for conversion from object to string.
         /// </summary>
-        /// <docgen category='Rendering Options' order='50' />
+        /// <docgen category='Layout Options' order='50' />
         public string Format { get; set; }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var value = GetValue();
@@ -66,7 +67,6 @@ namespace NLog.LayoutRenderers
             builder.AppendFormattedValue(value, Format, formatProvider, ValueFormatter);
         }
 
-        /// <inheritdoc/>
         string IStringValueRenderer.GetFormattedString(LogEventInfo logEvent) => GetStringValue(logEvent);
 
         private string GetStringValue(LogEventInfo logEvent)

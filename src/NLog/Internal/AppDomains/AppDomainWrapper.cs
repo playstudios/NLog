@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
 
 namespace NLog.Internal.Fakeables
 {
@@ -43,6 +43,7 @@ namespace NLog.Internal.Fakeables
     /// <summary>
     /// Adapter for <see cref="AppDomain"/> to <see cref="IAppDomain"/>
     /// </summary>
+    [Obsolete("For unit testing only. Marked obsolete on NLog 5.0")]
     internal class AppDomainWrapper : IAppDomain
     {
         private readonly AppDomain _currentAppDomain;
@@ -200,13 +201,13 @@ namespace NLog.Internal.Fakeables
         private void OnDomainUnload(object sender, EventArgs e)
         {
             var handler = domainUnloadEvent;
-            if (handler != null) handler.Invoke(sender, e);
+            handler?.Invoke(sender, e);
         }
 
         private void OnProcessExit(object sender, EventArgs eventArgs)
         {
             var handler = processExitEvent;
-            if (handler != null) handler.Invoke(sender, eventArgs);
+            handler?.Invoke(sender, eventArgs);
         }
     }
 }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -69,7 +69,7 @@ namespace NLog.Config
         /// <summary>
         /// Stack trace should be captured. This option won't add the filenames and linenumbers.
         /// </summary>
-        [Obsolete("Replace with `WithStackTrace`. Will be removed in NLog 6")]
+        [Obsolete("Replace with `WithStackTrace`. Marked obsolete on NLog 5.0")]
         WithoutSource = WithStackTrace,
 
         /// <summary>

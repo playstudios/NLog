@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,18 +33,15 @@
 
 #define DEBUG
 
-using NLog.Config;
-
 namespace NLog.UnitTests.Common
 {
-
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
     using NLog.Common;
+    using NLog.Config;
     using Xunit;
-    using Xunit.Extensions;
 
     public class InternalLoggerTests_Trace : NLogTestBase
     {
@@ -286,7 +283,7 @@ namespace NLog.UnitTests.Common
 
             Trace.Listeners.Clear();
 
-            if (traceListener == null)
+            if (traceListener is null)
             {
                 return null;
             }

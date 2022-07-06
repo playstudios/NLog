@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,7 +35,6 @@
 
 namespace NLog.LayoutRenderers
 {
-    using System.ComponentModel;
     using System.Text;
     using NLog.Config;
     using NLog.Internal.Fakeables;
@@ -46,7 +45,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("processname")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class ProcessNameLayoutRenderer : LayoutRenderer
     {
         private readonly string _processFilePath;
@@ -55,8 +53,7 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Gets or sets a value indicating whether to write the full path to the process executable.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(false)]
+        /// <docgen category='Layout Options' order='10' />
         public bool FullName { get; set; }
 
         /// <summary>
@@ -76,11 +73,7 @@ namespace NLog.LayoutRenderers
             _processBaseName = appEnvironment.CurrentProcessBaseName;
         }
 
-        /// <summary>
-        /// Renders the current process name (optionally with a full path).
-        /// </summary>
-        /// <param name="builder">The <see cref="StringBuilder"/> to append the rendered data to.</param>
-        /// <param name="logEvent">Logging event.</param>
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var output = FullName ? _processFilePath : _processBaseName;

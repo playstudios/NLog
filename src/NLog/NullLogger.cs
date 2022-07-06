@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -35,13 +35,12 @@ namespace NLog
 {
     using Internal;
     using System;
-    using System.Diagnostics.CodeAnalysis;
 
     /// <summary>
-    /// It works as a normal <see cref="T:NLog.Logger" /> but it discards all messages which an application requests 
+    /// It works as a normal <see cref="Logger" /> but it discards all messages which an application requests 
     /// to be logged.
     /// 
-    /// It effectively implements the "Null Object" pattern for <see cref="T:NLog.Logger" /> objects.  
+    /// It effectively implements the "Null Object" pattern for <see cref="Logger" /> objects.  
     /// </summary>
     public sealed class NullLogger : Logger
     {
@@ -51,13 +50,12 @@ namespace NLog
         /// <param name="factory">The factory class to be used for the creation of this logger.</param>
         public NullLogger(LogFactory factory)
         {
-            if (factory == null)
+            if (factory is null)
             {
                 throw new ArgumentNullException(nameof(factory));
             }
 
-            TargetWithFilterChain[] targetsByLevel = new TargetWithFilterChain[LogLevel.MaxLevel.Ordinal + 1];
-            Initialize(string.Empty, new LoggerConfiguration(targetsByLevel), factory);
+            Initialize(string.Empty, TargetWithFilterChain.NoTargetsByLevel, factory);
         }
     }
 }

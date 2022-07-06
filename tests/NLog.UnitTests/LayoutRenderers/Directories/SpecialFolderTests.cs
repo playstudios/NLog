@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -72,6 +72,24 @@ namespace NLog.UnitTests.LayoutRenderers
         public void SpecialFolderDirFileCombineTest()
         {
             AssertLayoutRendererOutput($"${{specialfolder:folder={sysDirString}:dir=aaa:file=bbb.txt}}", Path.Combine(sysDir, "aaa", "bbb.txt"));
+        }
+
+        [Fact]
+        public void SpecialFolderCommonApplicationDataTest()
+        {
+            AssertLayoutRendererOutput("${CommonApplicationDataDir}", Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
+        }
+
+        [Fact]
+        public void SpecialFolderUserApplicationDataTest()
+        {
+            AssertLayoutRendererOutput("${UserApplicationDataDir}", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+        }
+
+        [Fact]
+        public void SpecialFolderUserLocalApplicationDataTest()
+        {
+            AssertLayoutRendererOutput("${UserLocalApplicationDataDir}", Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
         }
     }
 #endif

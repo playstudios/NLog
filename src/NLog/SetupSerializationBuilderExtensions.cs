@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -65,10 +65,10 @@ namespace NLog
         /// </summary>
         public static ISetupSerializationBuilder RegisterObjectTransformation<T>(this ISetupSerializationBuilder setupBuilder, Func<T, object> transformer)
         {
-            if (transformer == null)
+            if (transformer is null)
                 throw new ArgumentNullException(nameof(transformer));
 
-            var original = setupBuilder.LogFactory.ServiceRepository.ResolveService<IObjectTypeTransformer>();
+            var original = setupBuilder.LogFactory.ServiceRepository.GetService<IObjectTypeTransformer>();
             setupBuilder.LogFactory.ServiceRepository.RegisterObjectTypeTransformer(new ObjectTypeTransformation<T>(transformer, original));
             return setupBuilder;
         }
@@ -78,12 +78,12 @@ namespace NLog
         /// </summary>
         public static ISetupSerializationBuilder RegisterObjectTransformation(this ISetupSerializationBuilder setupBuilder, Type objectType, Func<object, object> transformer)
         {
-            if (objectType == null)
+            if (objectType is null)
                 throw new ArgumentNullException(nameof(objectType));
-            if (transformer == null)
+            if (transformer is null)
                 throw new ArgumentNullException(nameof(transformer));
 
-            var original = setupBuilder.LogFactory.ServiceRepository.ResolveService<IObjectTypeTransformer>();
+            var original = setupBuilder.LogFactory.ServiceRepository.GetService<IObjectTypeTransformer>();
             setupBuilder.LogFactory.ServiceRepository.RegisterObjectTypeTransformer(new ObjectTypeTransformation(objectType, transformer, original));
             return setupBuilder;
         }

@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -39,23 +39,19 @@ namespace NLog.UnitTests.Mocks
 {
     class WebRequestFactoryMock : IWebRequestFactory
     {
-        #region Implementation of IWebRequestFactory
-
         private readonly WebRequestMock _mock;
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         public WebRequestFactoryMock(WebRequestMock mock)
         {
             _mock = mock;
         }
         
-        /// <inheritdoc />
+        /// <inheritdoc/>
         public WebRequest CreateWebRequest(Uri address)
         {
             _mock.RequestedAddress = address;
             return _mock;
         }
-
-        #endregion
     }
 }

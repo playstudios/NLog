@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -33,7 +33,6 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using NLog.Config;
 using NLog.Targets;
 using Xunit;
 
@@ -157,37 +156,38 @@ namespace NLog.UnitTests.Targets
         [Fact]
         public void FluentDelegateConfiguration()
         {
-            var configuration = new LoggingConfiguration();
-
             string expectedMessage = "Hello World";
             string actualMessage = string.Empty;
-            configuration.AddRuleForAllLevels(new MethodCallTarget("Hello", (logEvent, parameters) => { actualMessage = logEvent.Message; }));
-            LogManager.Configuration = configuration;
 
-            LogManager.GetCurrentClassLogger().Debug(expectedMessage);
+            var logFactory = new LogFactory().Setup().LoadConfiguration(builder =>
+            {
+                var target = new MethodCallTarget("Hello", (logEvent, parameters) => { actualMessage = logEvent.Message; });
+                builder.ForLogger().WriteTo(target);
+            }).LogFactory;
+
+            logFactory.GetCurrentClassLogger().Debug(expectedMessage);
 
             Assert.Equal(expectedMessage, actualMessage);
         }
 
         private static void TestMethodCall(MethodCallRecord expected, string methodName, string className)
         {
-            var target = new MethodCallTarget
+            var logFactory = new LogFactory().Setup().LoadConfiguration(builder =>
             {
-                Name = "t1",
-                ClassName = className,
-                MethodName = methodName
-            };
-            target.Parameters.Add(new MethodCallParameter("param1", "test1"));
-            target.Parameters.Add(new MethodCallParameter("param2", "2", typeof(int)));
-
-            var configuration = new LoggingConfiguration();
-            configuration.AddTarget(target);
-            configuration.LoggingRules.Add(new LoggingRule("*", LogLevel.Debug, target));
-            LogManager.Configuration = configuration;
+                var target = new MethodCallTarget
+                {
+                    Name = "t1",
+                    ClassName = className,
+                    MethodName = methodName
+                };
+                target.Parameters.Add(new MethodCallParameter("param1", "test1"));
+                target.Parameters.Add(new MethodCallParameter("param2", "2", typeof(int)));
+                builder.ForLogger().WriteTo(target);
+            }).LogFactory;
 
             LastCallTest = null;
 
-            LogManager.GetCurrentClassLogger().Debug("test method 1");
+            logFactory.GetCurrentClassLogger().Debug("test method 1");
 
             Assert.Equal(expected, LastCallTest);
         }
@@ -199,8 +199,8 @@ namespace NLog.UnitTests.Targets
             /// </summary>
             public MethodCallRecord(string method, params object[] parameterValues)
             {
-                Method = method;
-                if (parameterValues != null) ParameterValues = parameterValues.ToList();
+                Method = method ?? string.Empty;
+                ParameterValues = parameterValues?.ToList() ?? new List<object>();
             }
 
             public string Method { get; set; }
@@ -220,10 +220,7 @@ namespace NLog.UnitTests.Targets
             /// <param name="obj">The object to compare with the current object. </param>
             public override bool Equals(object obj)
             {
-                if (ReferenceEquals(null, obj)) return false;
-                if (ReferenceEquals(this, obj)) return true;
-                if (obj.GetType() != GetType()) return false;
-                return Equals((MethodCallRecord)obj);
+                return obj is MethodCallRecord other && Equals(other);
             }
 
             /// <summary>
@@ -236,7 +233,7 @@ namespace NLog.UnitTests.Targets
             {
                 unchecked
                 {
-                    return ((Method != null ? Method.GetHashCode() : 0) * 397) ^ (ParameterValues != null ? ParameterValues.GetHashCode() : 0);
+                    return Method.GetHashCode() * 397 ^ ParameterValues.Count.GetHashCode();
                 }
             }
         }

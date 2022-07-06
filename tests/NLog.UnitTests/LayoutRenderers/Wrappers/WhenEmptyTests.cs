@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -71,16 +71,22 @@ namespace NLog.UnitTests.LayoutRenderers.Wrappers
         [Fact]
         public void WhenEmpty_MissingInner_ShouldNotThrow()
         {
-            LogManager.ThrowExceptions = true;
-            SimpleLayout l = @"${whenEmpty:whenEmpty=${literal:text=c:\logs\}:inner=${environment:LOG_DIR_XXX}}api.log";
-            var le = LogEventInfo.Create(LogLevel.Info, "logger", "message");
-            Assert.Equal("api.log", l.Render(le));
+            using (new NoThrowNLogExceptions())
+            {
+                SimpleLayout l = @"${whenEmpty:whenEmpty=${literal:text=c:\logs\}:inner=${environment:LOG_DIR_XXX}}api.log";
+                var le = LogEventInfo.Create(LogLevel.Info, "logger", "message");
+                LogManager.ThrowExceptions = true;
+                Assert.Equal("api.log", l.Render(le));
+            }
         }
 
-        [Fact]
-        public void WhenDbNullRawValueShouldWork()
+        [Theory]
+        [InlineData("${db-null}")]
+        [InlineData("${dbnull}")]
+        [InlineData("${db-n-u-l-l}")]
+        public void WhenDbNullRawValueShouldWork(string layoutRenderer)
         {
-            SimpleLayout l = @"${event-properties:prop1:whenEmpty=${db-null}}";
+            SimpleLayout l = $@"${{event-properties:prop1:whenEmpty={layoutRenderer}}}";
             {
                 var le = LogEventInfo.Create(LogLevel.Info, "logger", "message");
                 le.Properties["prop1"] = 1;

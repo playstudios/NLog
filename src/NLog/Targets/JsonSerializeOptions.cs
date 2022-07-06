@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,48 +31,50 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using System.ComponentModel;
-
 namespace NLog.Targets
 {
+    using System;
+    using System.ComponentModel;
+
     /// <summary>
-    /// Options for JSON serialisation
+    /// Options for JSON serialization
     /// </summary>
     public class JsonSerializeOptions
     {
         /// <summary>
         /// Add quotes around object keys?
         /// </summary>
-        [DefaultValue(true)]
-        public bool QuoteKeys { get; set; }
+        [Obsolete("Marked obsolete on NLog 5.0.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public bool QuoteKeys { get; set; } = true;
 
         /// <summary>
         /// Format provider for value
         /// </summary>
+        [Obsolete("Marked obsolete on NLog 5.0. Should always be InvariantCulture.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public IFormatProvider FormatProvider { get; set; }
 
         /// <summary>
         /// Format string for value
         /// </summary>
+        [Obsolete("Marked obsolete on NLog 5.0. Should always be InvariantCulture.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public string Format { get; set; }
 
         /// <summary>
         /// Should non-ascii characters be encoded
         /// </summary>
-        [DefaultValue(false)]
         public bool EscapeUnicode { get; set; }
 
         /// <summary>
         /// Should forward slashes be escaped? If true, / will be converted to \/ 
         /// </summary>
-        [DefaultValue(true)]
-        public bool EscapeForwardSlash { get; set; } = true; // todo NLog 5, default to false
+        public bool EscapeForwardSlash { get; set; }
         
         /// <summary>
         /// Serialize enum as string value
         /// </summary>
-        [DefaultValue(false)]
         public bool EnumAsInteger { get; set; }
 
         /// <summary>
@@ -80,20 +82,11 @@ namespace NLog.Targets
         /// 
         /// Any other characters will be converted to underscore character (_)
         /// </summary>
-        [DefaultValue(false)]
         public bool SanitizeDictionaryKeys { get; set; }
 
         /// <summary>
         /// How far down the rabbit hole should the Json Serializer go with object-reflection before stopping
         /// </summary>
-        [DefaultValue(10)]
-        public int MaxRecursionLimit { get; set; }
-
-        /// <summary>Initializes a new instance of the <see cref="T:System.Object" /> class.</summary>
-        public JsonSerializeOptions()
-        {
-            QuoteKeys = true;
-            MaxRecursionLimit = 10;
-        }
+        public int MaxRecursionLimit { get; set; } = 10;
     }
 }

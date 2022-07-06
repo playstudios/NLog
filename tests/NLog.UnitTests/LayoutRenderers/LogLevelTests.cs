@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,11 +31,9 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using NLog.Config;
-
 namespace NLog.UnitTests.LayoutRenderers
 {
+    using System;
     using Xunit;
 
     public class LogLevelTests : NLogTestBase
@@ -43,104 +41,128 @@ namespace NLog.UnitTests.LayoutRenderers
         [Fact]
         public void LogLevelTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
             <nlog>
                 <targets><target name='debug' type='Debug' layout='${level} ${message}' /></targets>
                 <rules>
                     <logger name='*' minlevel='Debug' writeTo='debug' />
                 </rules>
-            </nlog>");
+            </nlog>").LogFactory;
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = logFactory.GetLogger("A");
             logger.Debug("a");
-            AssertDebugLastMessage("debug", "Debug a");
+            logFactory.AssertDebugLastMessage("Debug a");
             logger.Info("a");
-            AssertDebugLastMessage("debug", "Info a");
+            logFactory.AssertDebugLastMessage("Info a");
             logger.Warn("a");
-            AssertDebugLastMessage("debug", "Warn a");
+            logFactory.AssertDebugLastMessage("Warn a");
             logger.Error("a");
-            AssertDebugLastMessage("debug", "Error a");
+            logFactory.AssertDebugLastMessage("Error a");
             logger.Fatal("a");
-            AssertDebugLastMessage("debug", "Fatal a");
+            logFactory.AssertDebugLastMessage("Fatal a");
+        }
+
+        [Fact]
+        public void LogLevelUppercaseTest()
+        {
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
+            <nlog>
+                <targets><target name='debug' type='Debug' layout='${level:uppercase=true} ${message}' /></targets>
+                <rules>
+                    <logger name='*' minlevel='Debug' writeTo='debug' />
+                </rules>
+            </nlog>").LogFactory;
+
+            ILogger logger = logFactory.GetLogger("A");
+            logger.Debug("a");
+            logFactory.AssertDebugLastMessage("DEBUG a");
+            logger.Info("a");
+            logFactory.AssertDebugLastMessage("INFO a");
+            logger.Warn("a");
+            logFactory.AssertDebugLastMessage("WARN a");
+            logger.Error("a");
+            logFactory.AssertDebugLastMessage("ERROR a");
+            logger.Fatal("a");
+            logFactory.AssertDebugLastMessage("FATAL a");
         }
 
         [Fact]
         public void LogLevelSingleCharacterTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
             <nlog>
                 <targets><target name='debug' type='Debug' layout='${level:format=FirstCharacter} ${message}' /></targets>
                 <rules>
                     <logger name='*' minlevel='Trace' writeTo='debug' />
                 </rules>
-            </nlog>");
+            </nlog>").LogFactory;
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = logFactory.GetLogger("A");
             logger.Trace("a");
-            AssertDebugLastMessage("debug", "T a");
+            logFactory.AssertDebugLastMessage("T a");
             logger.Debug("a");
-            AssertDebugLastMessage("debug", "D a");
+            logFactory.AssertDebugLastMessage("D a");
             logger.Info("a");
-            AssertDebugLastMessage("debug", "I a");
+            logFactory.AssertDebugLastMessage("I a");
             logger.Warn("a");
-            AssertDebugLastMessage("debug", "W a");
+            logFactory.AssertDebugLastMessage("W a");
             logger.Error("a");
-            AssertDebugLastMessage("debug", "E a");
+            logFactory.AssertDebugLastMessage("E a");
             logger.Fatal("a");
-            AssertDebugLastMessage("debug", "F a");
+            logFactory.AssertDebugLastMessage("F a");
         }
 
         [Fact]
         public void LogLevelOrdinalTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
             <nlog>
                 <targets><target name='debug' type='Debug' layout='${level:format=Ordinal} ${message}' /></targets>
                 <rules>
                     <logger name='*' minlevel='Trace' writeTo='debug' />
                 </rules>
-            </nlog>");
+            </nlog>").LogFactory;
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = logFactory.GetLogger("A");
             logger.Trace("a");
-            AssertDebugLastMessage("debug", "0 a");
+            logFactory.AssertDebugLastMessage("0 a");
             logger.Debug("a");
-            AssertDebugLastMessage("debug", "1 a");
+            logFactory.AssertDebugLastMessage("1 a");
             logger.Info("a");
-            AssertDebugLastMessage("debug", "2 a");
+            logFactory.AssertDebugLastMessage("2 a");
             logger.Warn("a");
-            AssertDebugLastMessage("debug", "3 a");
+            logFactory.AssertDebugLastMessage("3 a");
             logger.Error("a");
-            AssertDebugLastMessage("debug", "4 a");
+            logFactory.AssertDebugLastMessage("4 a");
             logger.Fatal("a");
-            AssertDebugLastMessage("debug", "5 a");
+            logFactory.AssertDebugLastMessage("5 a");
         }
 
 
         [Fact]
         public void LogLevelFullNameTest()
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(@"
+            var logFactory = new LogFactory().Setup().LoadConfigurationFromXml(@"
             <nlog>
                 <targets><target name='debug' type='Debug' layout='${level:format=FullName} ${message}' /></targets>
                 <rules>
                     <logger name='*' minlevel='Trace' writeTo='debug' />
                 </rules>
-            </nlog>");
+            </nlog>").LogFactory;
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = logFactory.GetLogger("A");
             logger.Trace("a");
-            AssertDebugLastMessage("debug", "Trace a");
+            logFactory.AssertDebugLastMessage("Trace a");
             logger.Debug("a");
-            AssertDebugLastMessage("debug", "Debug a");
+            logFactory.AssertDebugLastMessage("Debug a");
             logger.Info("a");
-            AssertDebugLastMessage("debug", "Information a");
+            logFactory.AssertDebugLastMessage("Information a");
             logger.Warn("a");
-            AssertDebugLastMessage("debug", "Warning a");
+            logFactory.AssertDebugLastMessage("Warning a");
             logger.Error("a");
-            AssertDebugLastMessage("debug", "Error a");
+            logFactory.AssertDebugLastMessage("Error a");
             logger.Fatal("a");
-            AssertDebugLastMessage("debug", "Fatal a");
+            logFactory.AssertDebugLastMessage("Fatal a");
         }
 
         [Fact]
@@ -163,18 +185,14 @@ namespace NLog.UnitTests.LayoutRenderers
         public void LogLevelConvertTest(Type type, object expected)
         {
             // Arrange
-            IConvertible logLevel = LogLevel.Info;
+            IFormattable logLevel = LogLevel.Info;
             var logConverter = System.ComponentModel.TypeDescriptor.GetConverter(typeof(LogLevel));
                 
             // Act
-            var changeTypeResult = Convert.ChangeType(logLevel, type);
-            var changeToResult = logLevel.ToType(type, System.Globalization.CultureInfo.CurrentCulture);
             var convertToResult = logConverter.CanConvertTo(type) ? logConverter.ConvertTo(logLevel, type) : null;
             var convertFromResult = logConverter.CanConvertFrom(expected.GetType()) ? logConverter.ConvertFrom(expected) : null;
 
             // Assert
-            Assert.Equal(expected, changeTypeResult);
-            Assert.Equal(expected, changeToResult);
             Assert.Equal(expected, convertToResult);
             Assert.Equal(logLevel, convertFromResult);
         }

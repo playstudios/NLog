@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,7 +44,7 @@ namespace NLog
     public static class GlobalDiagnosticsContext
     {
         private static readonly object _lockObject = new object();
-        private static Dictionary<string, object> _dict = new Dictionary<string, object>();
+        private static Dictionary<string, object> _dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, object> _dictReadOnly;  // Reset cache on change
 
         /// <summary>
@@ -152,7 +152,7 @@ namespace NLog
         private static Dictionary<string, object> GetReadOnlyDict()
         {
             var readOnly = _dictReadOnly;
-            if (readOnly == null)
+            if (readOnly is null)
             {
                 lock (_lockObject)
                 {
@@ -175,7 +175,7 @@ namespace NLog
 
         private static Dictionary<string, object> CopyDictionaryOnWrite(bool clearDictionary)
         {
-            var newDict = new Dictionary<string, object>(clearDictionary ? 0 : _dict.Count + 1);
+            var newDict = new Dictionary<string, object>(clearDictionary ? 0 : _dict.Count + 1, _dict.Comparer);
             if (!clearDictionary)
             {
                 // Less allocation with enumerator than Dictionary-constructor

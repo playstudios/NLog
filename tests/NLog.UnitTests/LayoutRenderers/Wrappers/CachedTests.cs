@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -101,7 +101,7 @@ namespace NLog.UnitTests.LayoutRenderers.Wrappers
             </nlog>");
             LogManager.Configuration.Variables["var1"] = "a";
 
-            ILogger logger = LogManager.GetLogger("A");
+            var logger = LogManager.GetLogger("A");
             logger.Debug("msg");
             var s1 = GetDebugLastMessage("debug");
             logger.Debug("msg");
@@ -119,11 +119,11 @@ namespace NLog.UnitTests.LayoutRenderers.Wrappers
         [Fact]
         public void CachedSecondsTimeoutTest()
         {
-            SimpleLayout l = "${guid:cachedSeconds=10}";
+            SimpleLayout l = "${guid:cachedSeconds=60}";
             var s1 = l.Render(LogEventInfo.CreateNullEvent());
             var s2 = l.Render(new LogEventInfo());
             Assert.Equal(s1, s2);
-            var s3 = l.Render(new LogEventInfo() { TimeStamp = NLog.Time.TimeSource.Current.Time.AddMinutes(1) });
+            var s3 = l.Render(new LogEventInfo() { TimeStamp = NLog.Time.TimeSource.Current.Time.AddMinutes(2) });
             Assert.NotEqual(s2, s3);
         }
     }

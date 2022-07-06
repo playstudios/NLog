@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -45,7 +45,6 @@ namespace NLog.LayoutRenderers
     [LayoutRenderer("appdomain")]
     [AppDomainFixedOutput]
     [ThreadAgnostic]
-    [ThreadSafe]
     public class AppDomainLayoutRenderer : LayoutRenderer
     {
         private const string ShortFormat = "{0:00}";
@@ -53,34 +52,32 @@ namespace NLog.LayoutRenderers
         private const string LongFormatCode = "Long";
         private const string ShortFormatCode = "Short";
 
-        private readonly IAppDomain _currentDomain;
+        private readonly IAppEnvironment _currentAppEnvironment;
 
         /// <summary>
         /// Create a new renderer
         /// </summary>
         public AppDomainLayoutRenderer()
-            : this(LogFactory.CurrentAppDomain)
+            : this(LogFactory.DefaultAppEnvironment)
         {
         }
 
         /// <summary>
         /// Create a new renderer
         /// </summary>
-        public AppDomainLayoutRenderer(IAppDomain currentDomain)
+        internal AppDomainLayoutRenderer(IAppEnvironment appEnvironment)
         {
-            _currentDomain = currentDomain;
-            Format = LongFormatCode;
+            _currentAppEnvironment = appEnvironment;
         }
 
         /// <summary>
         /// Format string. Possible values: "Short", "Long" or custom like {0} {1}. Default "Long"
-        /// The first parameter is the  <see cref="IAppDomain.Id"/>, the second the second the  <see cref="IAppDomain.FriendlyName"/>
+        /// The first parameter is the AppDomain.Id, the second the second the AppDomain.FriendlyName
         /// This string is used in <see cref="string.Format(string,object[])"/>
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
+        /// <docgen category='Layout Options' order='10' />
         [DefaultParameter]
-        [DefaultValue(LongFormatCode)]
-        public string Format { get; set; }
+        public string Format { get; set; } = LongFormatCode;
 
         /// <inheritdoc/>
         protected override void InitializeLayoutRenderer()
@@ -101,10 +98,10 @@ namespace NLog.LayoutRenderers
         /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
-            if (_assemblyName == null)
+            if (_assemblyName is null)
             {
                 var formattingString = GetFormattingString(Format);
-                _assemblyName = string.Format(formattingString, _currentDomain.Id, _currentDomain.FriendlyName);
+                _assemblyName = string.Format(formattingString, _currentAppEnvironment.AppDomainId, _currentAppEnvironment.AppDomainFriendlyName);
             }
             builder.Append(_assemblyName);
         }

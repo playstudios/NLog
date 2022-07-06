@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -39,10 +39,10 @@ namespace NLog.MessageTemplates
     internal struct LiteralHole
     {
         /// <summary>Literal</summary>
-        public readonly Literal Literal;
+        public Literal Literal; // Not readonly to avoid struct-copy, and to avoid VerificationException when medium-trust AppDomain
         /// <summary>Hole</summary>
         /// <remarks>Uninitialized when <see cref="MessageTemplates.Literal.Skip"/> = 0.</remarks>
-        public readonly Hole Hole;
+        public Hole Hole;       // Not readonly to avoid struct-copy, and to avoid VerificationException when medium-trust AppDomain
 
         public LiteralHole(Literal literal, Hole hole)
         {

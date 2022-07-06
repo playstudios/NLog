@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,13 +31,13 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using System;
-using JetBrains.Annotations;
-using NLog.Config;
 
 namespace NLog.UnitTests.Config
 {
+    using System;
     using System.Text;
+    using JetBrains.Annotations;
+    using NLog.Config;
     using NLog.Targets;
     using Xunit;
 
@@ -121,11 +121,105 @@ namespace NLog.UnitTests.Config
             AssertCycleException<TargetWithDirectCycleInjection>(logFactory);
         }
 
+        [Fact]
+        public void ResolveWithIndirectCycleShouldThrow()
+        {
+            // Arrange
+            var logFactory = new LogFactory();
+
+            // Act & Assert
+            AssertCycleException<TargetWithIndirectCycleInjection>(logFactory);
+        }
+
+        [Fact]
+        public void HandleDelayedInjectDependenciesFailure()
+        {
+            using (new NoThrowNLogExceptions())
+            {
+                // Arrange
+                var logFactory = new LogFactory();
+                logFactory.ThrowConfigExceptions = true;
+                var logConfig = new LoggingConfiguration(logFactory);
+                var logTarget = new TargetWithMissingDependency() { Name = "NeedDependency" };
+                logConfig.AddRuleForAllLevels(logTarget);
+
+                // Act
+                logFactory.Configuration = logConfig;
+                logFactory.GetLogger("Test").Info("Test");
+
+                // Assert
+                Assert.Null(logTarget.LastLogEvent);
+            }
+        }
+
+        [Fact]
+        public void HandleDelayedInjectDependenciesSuccess()
+        {
+            using (new NoThrowNLogExceptions())
+            {
+                // Arrange
+                var logFactory = new LogFactory();
+                logFactory.ThrowConfigExceptions = true;
+                var logConfig = new LoggingConfiguration(logFactory);
+                var logTarget = new TargetWithMissingDependency() { Name = "NeedDependency" };
+                logConfig.AddRuleForAllLevels(logTarget);
+
+                // Act
+                logFactory.Configuration = logConfig;
+                logFactory.GetLogger("Test").Info("Test");
+                logFactory.ServiceRepository.RegisterSingleton<IMisingDependencyClass>(new MisingDependencyClass());
+                logFactory.GetLogger("Test").Info("Test Again");
+
+                // Assert
+                Assert.NotNull(logTarget.LastLogEvent);
+            }
+        }
+
+        [Fact]
+        public void HandleLayoutRendererDependency()
+        {
+            // Arrange
+            var logFactory = new LogFactory().Setup().SetupExtensions(ext =>
+            {
+                ext.RegisterLayoutRenderer<LayoutRendererUsingDependency>();
+                ext.RegisterServiceProvider(new ExternalServiceRepository(t => t == typeof(IMisingDependencyClass) ? new MisingDependencyClass() : null));
+            }).LoadConfiguration(builder =>
+            {
+                builder.ForLogger().WriteTo(new MemoryTarget() { Layout = "${NeedDependency}" });
+            }).LogFactory;
+
+            // Act
+            logFactory.GetLogger("Test").Info("Test");
+
+            // Assert
+            Assert.Equal("Success", (logFactory.Configuration.AllTargets[0] as MemoryTarget).Logs[0]);
+        }
+
+        [Fact]
+        public void ResolveShouldCheckExternalServiceProvider()
+        {
+            // Arrange
+            var logFactory = new LogFactory().Setup().SetupExtensions(ext =>
+            {
+                ext.RegisterSingletonService<IMyPrettyInterface>(new MyPrettyImplementation());
+                ext.RegisterSingletonService(typeof(IMyPrettyInterface), new MyPrettyImplementation());
+                ext.RegisterServiceProvider(new ExternalServiceRepository(t => t == typeof(IMisingDependencyClass) ? new MisingDependencyClass() : null));
+            }).LogFactory;
+
+            // Act
+            var missingDependency = logFactory.ServiceRepository.ResolveService<IMisingDependencyClass>(false);
+            var otherDependency = logFactory.ServiceRepository.ResolveService<IMyPrettyInterface>(false);
+
+            // Assert
+            Assert.NotNull(missingDependency);
+            Assert.NotNull(otherDependency);
+        }
+
         private static void AssertCycleException<T>(LogFactory logFactory) where T : class
         {
-            var ex = Assert.Throws<NLogResolveException>(() => logFactory.ServiceRepository.ResolveService<T>());
+            var ex = Assert.Throws<NLogDependencyResolveException>(() => logFactory.ServiceRepository.ResolveService<T>());
             Assert.Contains("cycle", ex.Message, StringComparison.OrdinalIgnoreCase);
-            Assert.Equal(typeof(T), ex.TypeToResolve);
+            Assert.Equal(typeof(T), ex.ServiceType);
         }
 
         private static void InitializeLogFactoryJsonConverter(LogFactory logFactory, string testValue, out Logger logger, out DebugTarget target)
@@ -177,7 +271,7 @@ namespace NLog.UnitTests.Config
         {
             public ClassWithInjection Helper { get; }
 
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public TargetWithNestedInjection([NotNull] ClassWithInjection helper)
             {
                 Helper = helper ?? throw new ArgumentNullException(nameof(helper));
@@ -186,7 +280,7 @@ namespace NLog.UnitTests.Config
 
         private class TargetWithDirectCycleInjection : Target
         {
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public TargetWithDirectCycleInjection(TargetWithDirectCycleInjection cycle1)
             {
             }
@@ -194,7 +288,7 @@ namespace NLog.UnitTests.Config
 
         private class TargetWithIndirectCycleInjection : Target
         {
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public TargetWithIndirectCycleInjection(CycleHelperClass1 helper)
             {
             }
@@ -202,7 +296,7 @@ namespace NLog.UnitTests.Config
 
         private class CycleHelperClass1
         {
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public CycleHelperClass1(CycleHelperClass2 helper)
             {
             }
@@ -210,7 +304,7 @@ namespace NLog.UnitTests.Config
 
         private class CycleHelperClass2
         {
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public CycleHelperClass2(CycleHelperClass1 helper)
             {
             }
@@ -220,10 +314,68 @@ namespace NLog.UnitTests.Config
         {
             public IJsonConverter JsonConverter { get; }
 
-            /// <inheritdoc />
+            /// <inheritdoc/>
             public ClassWithInjection(IJsonConverter jsonConverter)
             {
                 JsonConverter = jsonConverter;
+            }
+        }
+
+        private class TargetWithMissingDependency : Target
+        {
+            public LogEventInfo LastLogEvent { get; private set; }
+
+            protected override void InitializeTarget()
+            {
+                var wantedDependency = ResolveService<IMisingDependencyClass>();
+                base.InitializeTarget();
+            }
+
+            protected override void Write(LogEventInfo logEvent)
+            {
+                LastLogEvent = logEvent;
+            }
+        }
+
+        [NLog.LayoutRenderers.LayoutRenderer("needdependency")]
+        private class LayoutRendererUsingDependency : NLog.LayoutRenderers.LayoutRenderer
+        {
+            private object _wantedDependency;
+
+            protected override void InitializeLayoutRenderer()
+            {
+                _wantedDependency = ResolveService<IMisingDependencyClass>();
+                base.InitializeLayoutRenderer();
+            }
+
+            protected override void Append(StringBuilder builder, LogEventInfo logEvent)
+            {
+                builder.Append(_wantedDependency != null ? "Success" : "Failed");
+            }
+        }
+
+        private interface IMisingDependencyClass
+        {
+
+        }
+
+        private class MisingDependencyClass : IMisingDependencyClass
+        {
+
+        }
+
+        private class ExternalServiceRepository : IServiceProvider
+        {
+            private readonly Func<Type, object> _serviceResolver;
+
+            public ExternalServiceRepository(Func<Type, object> serviceResolver)
+            {
+                _serviceResolver = serviceResolver;
+            }
+
+            public object GetService(Type serviceType)
+            {
+                return _serviceResolver(serviceType);
             }
         }
     }

@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,18 +31,15 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-using NLog.LayoutRenderers;
-using NLog.Targets;
-using Xunit.Extensions;
-
 namespace NLog.UnitTests.Config
 {
     using System;
     using System.Globalization;
     using System.Threading;
-    using Xunit;
-
     using NLog.Config;
+    using NLog.LayoutRenderers;
+    using NLog.Targets;
+    using Xunit;
 
     public class CultureInfoTests : NLogTestBase
     {
@@ -105,7 +102,7 @@ namespace NLog.UnitTests.Config
             var expected = string.Format(culture, formatString, parameters);
             var logger = logFactory.GetLogger("test");
             logger.Debug(formatString, parameters);
-            Assert.Equal(expected, GetDebugLastMessage("debug", logFactory.Configuration));
+            Assert.Equal(expected, GetDebugLastMessage("debug", logFactory));
         }
 
         [Fact]
@@ -133,7 +130,7 @@ namespace NLog.UnitTests.Config
 
             var logEventInfo = CreateLogEventInfo(cultureName);
 
-            if (IsTravis())
+            if (IsLinux())
             {
                 Console.WriteLine("[SKIP] CultureInfoTests.ProcessInfoLayoutRendererCultureTest because we are running in Travis");
             }
@@ -172,24 +169,6 @@ namespace NLog.UnitTests.Config
             Assert.Equal(expected, output);
         }
 
-        [Theory]
-        [InlineData(typeof(TimeLayoutRenderer))]
-        [InlineData(typeof(ProcessTimeLayoutRenderer))]
-        public void DateTimeCultureTest(Type rendererType)
-        {
-            string cultureName = "de-DE";
-            string expected = ",";   // decimal comma as separator for ticks
-
-            var logEventInfo = CreateLogEventInfo(cultureName);
-
-            var renderer = Activator.CreateInstance(rendererType) as LayoutRenderer;
-            Assert.NotNull(renderer);
-            string output = renderer.Render(logEventInfo);
-
-            Assert.Contains(expected, output);
-            Assert.DoesNotContain(".", output);
-        }
-
         private static LogEventInfo CreateLogEventInfo(string cultureName)
         {
             var logEventInfo = new LogEventInfo(
@@ -208,8 +187,10 @@ namespace NLog.UnitTests.Config
         public void ExceptionTest()
         {
             var target = new MemoryTarget { Layout = @"${exception:format=tostring}" };
-            SimpleConfigurator.ConfigureForTargetLogging(target);
-            var logger = LogManager.GetCurrentClassLogger();
+            var logger = new LogFactory().Setup().LoadConfiguration(builder =>
+            {
+                builder.ForLogger().WriteTo(target);
+            }).GetCurrentClassLogger();
 
             try
             {

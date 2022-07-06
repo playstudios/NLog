@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !NETSTANDARD1_0 || NETSTANDARD1_5
+#if !NETSTANDARD1_3
 #define CaptureCallSiteInfo
 #endif
 
@@ -53,13 +53,12 @@ namespace NLog
     {
         private const int StackTraceSkipMethods = 0;
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", Justification = "Using 'NLog' in message.")]
         internal static void Write([NotNull] Type loggerType, [NotNull] TargetWithFilterChain targetsForLevel, LogEventInfo logEvent, LogFactory logFactory)
         {
-            logEvent.SetMessageFormatter(logFactory.ActiveMessageFormatter, targetsForLevel.NextInChain == null ? logFactory.SingleTargetMessageFormatter : null);
+            logEvent.SetMessageFormatter(logFactory.ActiveMessageFormatter, targetsForLevel.NextInChain is null ? logFactory.SingleTargetMessageFormatter : null);
 
 #if CaptureCallSiteInfo
-            StackTraceUsage stu = targetsForLevel.GetStackTraceUsage();
+            StackTraceUsage stu = targetsForLevel.StackTraceUsage;
             if (stu != StackTraceUsage.None)
             {
                 bool attemptCallSiteOptimization = targetsForLevel.TryCallSiteClassNameOptimization(stu, logEvent);
@@ -79,7 +78,7 @@ namespace NLog
             }
 #endif
 
-            AsyncContinuation exceptionHandler = (ex) => { };
+            AsyncContinuation exceptionHandler = SingleCallContinuation.Completed;
             if (logFactory.ThrowExceptions)
             {
                 int originalThreadId = AsyncHelpers.GetManagedThreadId();
@@ -92,19 +91,20 @@ namespace NLog
                 };
             }
 
-            IList<Filter> prevFilterChain = null;
+            IList<Filter> prevFilterChain = ArrayHelper.Empty<Filter>();
             FilterResult prevFilterResult = FilterResult.Neutral;
             for (var t = targetsForLevel; t != null; t = t.NextInChain)
             {
-                FilterResult result = ReferenceEquals(prevFilterChain, t.FilterChain) ?
-                    prevFilterResult : GetFilterResult(t.FilterChain, logEvent, t.DefaultResult);
+                var currentFilterChain = t.FilterChain;
+                FilterResult result = ReferenceEquals(prevFilterChain, currentFilterChain) ?
+                    prevFilterResult : GetFilterResult(currentFilterChain, logEvent, t.FilterDefaultAction);
                 if (!WriteToTargetWithFilterChain(t.Target, result, logEvent, exceptionHandler))
                 {
                     break;
                 }
 
                 prevFilterResult = result;  // Cache the result, and reuse it for the next target, if it comes from the same logging-rule
-                prevFilterChain = t.FilterChain;
+                prevFilterChain = currentFilterChain;
             }
         }
 
@@ -124,7 +124,12 @@ namespace NLog
             }
             catch (Exception ex)
             {
-                if (logFactory.ThrowExceptions || ex.MustBeRethrownImmediately())
+#if DEBUG
+                if (ex.MustBeRethrownImmediately())
+                    throw;
+#endif
+
+                if (logFactory.ThrowExceptions || LogManager.ThrowExceptions)
                     throw;
 
                 InternalLogger.Error(ex, "Failed to capture CallSite for Logger {0}. Platform might not support ${{callsite}}", logEvent.LoggerName);
@@ -163,11 +168,11 @@ namespace NLog
         /// </summary>
         /// <param name="filterChain">The filter chain.</param>
         /// <param name="logEvent">The log event.</param>
-        /// <param name="defaultFilterResult">default result if there are no filters, or none of the filters decides.</param>
+        /// <param name="filterDefaultAction">default result if there are no filters, or none of the filters decides.</param>
         /// <returns>The result of the filter.</returns>
-        private static FilterResult GetFilterResult(IList<Filter> filterChain, LogEventInfo logEvent, FilterResult defaultFilterResult)
+        private static FilterResult GetFilterResult(IList<Filter> filterChain, LogEventInfo logEvent, FilterResult filterDefaultAction)
         {
-            if (filterChain == null || filterChain.Count == 0) 
+            if (filterChain.Count == 0) 
                 return FilterResult.Neutral;
 
             try
@@ -184,7 +189,7 @@ namespace NLog
                     }
                 }
 
-                return defaultFilterResult;
+                return filterDefaultAction;
             }
             catch (Exception exception)
             {

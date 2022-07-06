@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -86,7 +86,7 @@ namespace NLog.UnitTests.Targets
         public void StringWithSlashAndQuotes_Test()
         {
             var text = "This sentence/text is \"normal\", we think.";
-            var expected = "\"This sentence\\/text is \\\"normal\\\", we think.\"";
+            var expected = "\"This sentence/text is \\\"normal\\\", we think.\"";
 
             var actual = SerializeObject(text);
             Assert.Equal(expected, actual);
@@ -177,6 +177,16 @@ namespace NLog.UnitTests.Targets
         [InlineData((ulong)32711520331, "32711520331")]
         [InlineData(3.14159265, "3.14159265")]
         [InlineData(2776145.7743, "2776145.7743")]
+        [InlineData(0D, "0.0")]
+        [InlineData(0F, "0.0")]
+        [InlineData(1D, "1.0")]
+        [InlineData(1F, "1.0")]
+        [InlineData(-1D, "-1.0")]
+        [InlineData(-1F, "-1.0")]
+        [InlineData(5e30D, "5E+30")]
+        [InlineData(5e30F, "5E+30")]
+        [InlineData(-5e30D, "-5E+30")]
+        [InlineData(-5e30F, "-5E+30")]
         [InlineData(double.NaN, "\"NaN\"")]
         [InlineData(double.PositiveInfinity, "\"Infinity\"")]
         [InlineData(float.NaN, "\"NaN\"")]
@@ -185,9 +195,6 @@ namespace NLog.UnitTests.Targets
         {
             var actual = SerializeObject(o);
             Assert.Equal(expected, actual);
-
-            var result = SerializeObject(o);
-            Assert.Equal(expected, result);
         }
 
         [Fact]
@@ -197,6 +204,46 @@ namespace NLog.UnitTests.Targets
             Assert.Equal("true", actual);
             actual = SerializeObject(false);
             Assert.Equal("false", actual);
+        }
+
+        [Fact]
+        public void SerializeNumberDecimal_Test()
+        {
+            var actual = SerializeObject(-1M);
+            Assert.Equal("-1.0", actual);
+
+            actual = SerializeObject(0M);
+            Assert.Equal("0.0", actual);
+
+            actual = SerializeObject(1M);
+            Assert.Equal("1.0", actual);
+
+            actual = SerializeObject(2M);
+            Assert.Equal("2.0", actual);
+
+            actual = SerializeObject(3M);
+            Assert.Equal("3.0", actual);
+
+            actual = SerializeObject(4M);
+            Assert.Equal("4.0", actual);
+
+            actual = SerializeObject(5M);
+            Assert.Equal("5.0", actual);
+
+            actual = SerializeObject(6M);
+            Assert.Equal("6.0", actual);
+
+            actual = SerializeObject(7M);
+            Assert.Equal("7.0", actual);
+
+            actual = SerializeObject(8M);
+            Assert.Equal("8.0", actual);
+
+            actual = SerializeObject(9M);
+            Assert.Equal("9.0", actual);
+
+            actual = SerializeObject(3.14159265M);
+            Assert.Equal("3.14159265", actual);
         }
 
         [Fact]
@@ -211,17 +258,41 @@ namespace NLog.UnitTests.Targets
         [Fact]
         public void SerializeDateTime_Test2()
         {
-            var val = new DateTime(2016, 12, 31);
-            var actual = SerializeObject(val);
-            Assert.Equal("\"" + "2016-12-31T00:00:00Z" + "\"", actual);
+            var culture = System.Threading.Thread.CurrentThread.CurrentCulture;
+
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("en-GB");    // uses "." instead of ":" for time
+
+                var val = new DateTime(2016, 12, 31);
+                var actual = SerializeObject(val);
+                Assert.Equal("\"" + "2016-12-31T00:00:00Z" + "\"", actual);
+            }
+            finally
+            {
+                // Restore
+                System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+            }
         }
 
         [Fact]
         public void SerializeDateTimeOffset_Test()
         {
-            var val = new DateTimeOffset(new DateTime(2016, 12, 31, 2, 30, 59), new TimeSpan(4, 30, 0));
-            var actual = SerializeObject(val);
-            Assert.Equal("\"" + "2016-12-31 02:30:59 +04:30" + "\"", actual);
+            var culture = System.Threading.Thread.CurrentThread.CurrentCulture;
+
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("en-GB");    // uses "." instead of ":" for time
+
+                var val = new DateTimeOffset(new DateTime(2016, 12, 31, 2, 30, 59), new TimeSpan(4, 30, 0));
+                var actual = SerializeObject(val);
+                Assert.Equal("\"" + "2016-12-31 02:30:59 +04:30" + "\"", actual);
+            }
+            finally
+            {
+                // Restore
+                System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+            }
         }
 
         [Fact]
@@ -241,8 +312,20 @@ namespace NLog.UnitTests.Targets
         [Fact]
         public void SerializeTime3_Test()
         {
-            var actual = SerializeObject(new TimeSpan(0, 0, 2, 3, 4));
-            Assert.Equal("\"00:02:03.0040000\"", actual);
+            var culture = System.Threading.Thread.CurrentThread.CurrentCulture;
+
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("en-GB");    // uses "." instead of ":" for time
+
+                var actual = SerializeObject(new TimeSpan(0, 0, 2, 3, 4));
+                Assert.Equal("\"00:02:03.0040000\"", actual);
+            }
+            finally
+            {
+                // Restore
+                System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+            }
         }
 
         [Fact]
@@ -263,6 +346,16 @@ namespace NLog.UnitTests.Targets
         }
 
         [Fact]
+        public void SerializeCustomNullDict_Test()
+        {
+            var dictionary = new Dictionary<string, object>();
+            dictionary.Add("key1", 13);
+            dictionary.Add("key 2", new CustomNullProperty());
+            var actual = SerializeObject(dictionary);
+            Assert.Equal("{\"key1\":13,\"key 2\":null}", actual);
+        }
+
+        [Fact]
         public void SerializeTrickyDict_Test()
         {
             IDictionary<object,object> dictionary = new Internal.TrickyTestDictionary();
@@ -275,22 +368,22 @@ namespace NLog.UnitTests.Targets
         [Fact]
         public void SerializeExpandoDict_Test()
         {
-            IDictionary<string, IConvertible> dictionary = new Internal.ExpandoTestDictionary();
+            IDictionary<string, IFormattable> dictionary = new Internal.ExpandoTestDictionary();
             dictionary.Add("key 2", 1.3m);
             dictionary.Add("level", LogLevel.Info);
             var actual = SerializeObject(dictionary);
-            Assert.Equal("{\"key 2\":1.3, \"level\":{\"Name\":\"Info\", \"Ordinal\":2}}", actual);
+            Assert.Equal("{\"key 2\":1.3, \"level\":\"Info\"}", actual);
         }
 
         [Fact]
         public void SerializEmptyExpandoDict_Test()
         {
-            IDictionary<string, IConvertible> dictionary = new Internal.ExpandoTestDictionary();
+            IDictionary<string, IFormattable> dictionary = new Internal.ExpandoTestDictionary();
             var actual = SerializeObject(dictionary);
             Assert.Equal("{}", actual);
         }
 
-#if NET4_5
+#if !NET35 && !NET40
         [Fact]
         public void SerializeReadOnlyExpandoDict_Test()
         {
@@ -300,7 +393,7 @@ namespace NLog.UnitTests.Targets
 
             var readonlyDictionary = new Internal.ReadOnlyExpandoTestDictionary(dictionary);
             var actual = SerializeObject(readonlyDictionary);
-            Assert.Equal("{\"key 2\":1.3, \"level\":{\"Name\":\"Info\", \"Ordinal\":2}}", actual);
+            Assert.Equal("{\"key 2\":1.3, \"level\":\"Info\"}", actual);
         }
 #endif
 
@@ -425,7 +518,7 @@ namespace NLog.UnitTests.Targets
             Assert.Equal("{\"Name\":\"test name\"}", actual);
         }
 
-#if NETSTANDARD || NET462 || NET47
+#if !NET35 && !NET45
         [Fact]
         public void SerializeValueTuple_Test()
         {
@@ -436,6 +529,7 @@ namespace NLog.UnitTests.Targets
             Assert.Equal("\"(test name, 1)\"", actual);
         }
 #endif
+
         [Fact]
         public void SerializeAnonymousObject_Test()
         {
@@ -444,7 +538,32 @@ namespace NLog.UnitTests.Targets
             Assert.Equal("{\"Id\":123, \"Name\":\"test name\"}", actual);
         }
 
-#if DYNAMIC_OBJECT
+        /// <summary>
+        /// Simulate behavior of JProperty("nullValue", null) from Newtonsoft.Json
+        /// </summary>
+        private class CustomNullProperty : IConvertible
+        {
+            TypeCode IConvertible.GetTypeCode() => TypeCode.Empty;
+            bool IConvertible.ToBoolean(IFormatProvider provider) => default(bool);
+            byte IConvertible.ToByte(IFormatProvider provider) => default(byte);
+            char IConvertible.ToChar(IFormatProvider provider) => default(char);
+            DateTime IConvertible.ToDateTime(IFormatProvider provider) => default(DateTime);
+            decimal IConvertible.ToDecimal(IFormatProvider provider) => default(decimal);
+            double IConvertible.ToDouble(IFormatProvider provider) => default(double);
+            short IConvertible.ToInt16(IFormatProvider provider) => default(short);
+            int IConvertible.ToInt32(IFormatProvider provider) => default(int);
+            long IConvertible.ToInt64(IFormatProvider provider) => default(long);
+            sbyte IConvertible.ToSByte(IFormatProvider provider) => default(sbyte);
+            float IConvertible.ToSingle(IFormatProvider provider) => default(float);
+            string IConvertible.ToString(IFormatProvider provider) => default(string);
+            object IConvertible.ToType(Type conversionType, IFormatProvider provider) => default(object);
+            ushort IConvertible.ToUInt16(IFormatProvider provider) => default(ushort);
+            uint IConvertible.ToUInt32(IFormatProvider provider) => default(uint);
+            ulong IConvertible.ToUInt64(IFormatProvider provider) => default(ulong);
+            public override string ToString() => "nullValue";
+        }
+
+#if !NET35 && !NET40
 
         [Fact]
         public void SerializeExpandoObject_Test()
@@ -552,7 +671,7 @@ namespace NLog.UnitTests.Targets
 
         protected class NoPropsObject
         {
-            private string something = "something";
+            private readonly string something = "something";
 
             #region Overrides of Object
 

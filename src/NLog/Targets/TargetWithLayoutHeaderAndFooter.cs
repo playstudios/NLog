@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -69,7 +69,7 @@ namespace NLog.Targets
                 {
                     base.Layout = value;
                 }
-                else if (LHF == null)
+                else if (LHF is null)
                 {
                     LHF = new LayoutWithHeaderAndFooter()
                     {

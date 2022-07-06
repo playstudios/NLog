@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -36,8 +36,8 @@
 namespace NLog.LayoutRenderers
 {
     using System;
-    using System.ComponentModel;
     using System.Diagnostics;
+    using System.Globalization;
     using System.Reflection;
     using System.Text;
     using NLog.Config;
@@ -47,7 +47,6 @@ namespace NLog.LayoutRenderers
     /// The information about the running process.
     /// </summary>
     [LayoutRenderer("processinfo")]
-    [ThreadSafe]
     public class ProcessInfoLayoutRenderer : LayoutRenderer
     {
         private Process _process;
@@ -56,23 +55,28 @@ namespace NLog.LayoutRenderers
         /// <summary>
         /// Gets or sets the property to retrieve.
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue("Id"), DefaultParameter]
+        /// <docgen category='Layout Options' order='10' />
+        [DefaultParameter]
         public ProcessInfoProperty Property { get; set; } = ProcessInfoProperty.Id;
 
         /// <summary>
         /// Gets or sets the format-string to use if the property supports it (Ex. DateTime / TimeSpan / Enum)
         /// </summary>
-        /// <docgen category='Rendering Options' order='10' />
-        [DefaultValue(null)]
+        /// <docgen category='Layout Options' order='10' />
         public string Format { get; set; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets or sets the culture used for rendering. 
+        /// </summary>
+        /// <docgen category='Layout Options' order='100' />
+        public CultureInfo Culture { get; set; } = CultureInfo.InvariantCulture;
+
+        /// <inheritdoc/>
         protected override void InitializeLayoutRenderer()
         {
             base.InitializeLayoutRenderer();
             var propertyInfo = typeof(Process).GetProperty(Property.ToString());
-            if (propertyInfo == null)
+            if (propertyInfo is null)
             {
                 throw new ArgumentException($"Property '{Property}' not found in System.Diagnostics.Process");
             }
@@ -82,25 +86,21 @@ namespace NLog.LayoutRenderers
             _process = Process.GetCurrentProcess();
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void CloseLayoutRenderer()
         {
-            if (_process != null)
-            {
-                _process.Close();
-                _process = null;
-            }
-
+            _process?.Close();
+            _process = null;
             base.CloseLayoutRenderer();
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc/>
         protected override void Append(StringBuilder builder, LogEventInfo logEvent)
         {
             var value = GetValue();
             if (value != null)
             {
-                var formatProvider = GetFormatProvider(logEvent);
+                var formatProvider = GetFormatProvider(logEvent, Culture);
                 builder.AppendFormattedValue(value, Format, formatProvider, ValueFormatter);
             }
         }

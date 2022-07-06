@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -104,7 +104,7 @@ namespace NLog.UnitTests.Targets.Wrappers
 
             // Assert
             Assert.Equal(LogEventWriteCount + 1, exceptions.Count); // +1 because of flush
-            Assert.Equal(LogEventWriteCount + 1 - logEventFailCount, exceptions.Count(ex => ex == null));
+            Assert.Equal(LogEventWriteCount + 1 - logEventFailCount, exceptions.Count(ex => ex is null));
             foreach (var target in targets)
             {
                 var myTarget = lookupTarget(target);
@@ -126,7 +126,7 @@ namespace NLog.UnitTests.Targets.Wrappers
                 Targets = { myTarget1, myTarget2, myTarget3 },
             };
 
-            Assert.Equal("SplitGroup Target[(unnamed)](MyTarget, File Target[file1], Console Target[Console2])", wrapper.ToString());
+            Assert.Equal("SplitGroup[MyTarget([unnamed]), FileTarget(Name=file1), ConsoleTarget(Name=Console2)]", wrapper.ToString());
         }
 
         public class MyTarget : Target

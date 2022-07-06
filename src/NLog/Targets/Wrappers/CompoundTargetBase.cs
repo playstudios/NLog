@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -37,7 +37,6 @@ namespace NLog.Targets.Wrappers
     using System.Collections.Generic;
     using System.Text;
     using NLog.Common;
-    using NLog.Internal;
 
     /// <summary>
     /// A base class for targets which wrap other (multiple) targets
@@ -59,26 +58,33 @@ namespace NLog.Targets.Wrappers
         /// </summary>
         public IList<Target> Targets { get; private set; }
 
-        /// <summary>
-        /// Returns the text representation of the object. Used for diagnostics.
-        /// </summary>
-        /// <returns>A string that describes the target.</returns>
+        /// <inheritdoc/>
         public override string ToString()
         {
-            string separator = string.Empty;
-            var sb = new StringBuilder();
-            sb.Append(base.ToString());
-            sb.Append("(");
+            return _tostring ?? (_tostring = GenerateTargetToString());
+        }
 
-            foreach (var t in Targets)
+        private string GenerateTargetToString()
+        {
+            if (string.IsNullOrEmpty(Name) && Targets?.Count > 0)
             {
-                sb.Append(separator);
-                sb.Append(t.ToString());
-                separator = ", ";
+                string separator = string.Empty;
+                var sb = new StringBuilder();
+                sb.Append(GenerateTargetToString(true));
+                sb.Append('[');
+
+                foreach (var t in Targets)
+                {
+                    sb.Append(separator);
+                    sb.Append(t.ToString());
+                    separator = ", ";
+                }
+
+                sb.Append(']');
+                return sb.ToString();
             }
 
-            sb.Append(")");
-            return sb.ToString();
+            return GenerateTargetToString(true);
         }
 
         /// <summary>

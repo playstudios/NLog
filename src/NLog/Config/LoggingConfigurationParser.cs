@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -69,7 +69,7 @@ namespace NLog.Config
         /// Loads NLog configuration from provided config section
         /// </summary>
         /// <param name="nlogConfig"></param>
-        /// <param name="basePath"></param>
+        /// <param name="basePath">Directory where the NLog-config-file was loaded from</param>
         protected void LoadConfig(ILoggingConfigurationElement nlogConfig, string basePath)
         {
             InternalLogger.Trace("ParseNLogConfig");
@@ -104,7 +104,9 @@ namespace NLog.Config
                 }
                 else if (!ParseNLogSection(child))
                 {
-                    InternalLogger.Warn("Skipping unknown 'NLog' child node: {0}", child.Name);
+                    var configException = new NLogConfigurationException($"Unrecognized element '{child.Name}' from section 'NLog'");
+                    if (MustThrowConfigException(configException))
+                        throw configException;
                 }
             }
 
@@ -118,8 +120,10 @@ namespace NLog.Config
         {
             var sortedList = CreateUniqueSortedListFromConfig(nlogConfig);
 
+            CultureInfo defaultCultureInfo = DefaultCultureInfo ?? LogFactory._defaultCultureInfo;
             bool? parseMessageTemplates = null;
             bool internalLoggerEnabled = false;
+            bool autoLoadExtensions = false;
             foreach (var configItem in sortedList)
             {
                 switch (configItem.Key.ToUpperInvariant())
@@ -136,7 +140,7 @@ namespace NLog.Config
                         break;
                     case "USEINVARIANTCULTURE":
                         if (ParseBooleanValue(configItem.Key, configItem.Value, false))
-                            DefaultCultureInfo = CultureInfo.InvariantCulture;
+                            defaultCultureInfo = DefaultCultureInfo = CultureInfo.InvariantCulture;
                         break;
                     case "KEEPVARIABLESONRELOAD":
                         LogFactory.KeepVariablesOnReload = ParseBooleanValue(configItem.Key, configItem.Value, LogFactory.KeepVariablesOnReload);
@@ -172,10 +176,20 @@ namespace NLog.Config
                         break;
                     case "AUTORELOAD":
                         break;  // Ignore here, used by other logic
+                    case "AUTOLOADEXTENSIONS":
+                        autoLoadExtensions = ParseBooleanValue(configItem.Key, configItem.Value, false);
+                        break;
                     default:
-                        InternalLogger.Debug("Skipping unknown 'NLog' property {0}={1}", configItem.Key, configItem.Value);
+                        var configException = new NLogConfigurationException($"Unrecognized value '{configItem.Key}'='{configItem.Value}' for element '{nlogConfig.Name}'");
+                        if (MustThrowConfigException(configException))
+                            throw configException;
                         break;
                 }
+            }
+
+            if (defaultCultureInfo != null && !ReferenceEquals(DefaultCultureInfo, defaultCultureInfo))
+            {
+                DefaultCultureInfo = defaultCultureInfo;
             }
 
             if (!internalLoggerEnabled && !InternalLogger.HasActiveLoggers())
@@ -183,7 +197,12 @@ namespace NLog.Config
                 InternalLogger.LogLevel = LogLevel.Off; // Reduce overhead of the InternalLogger when not configured
             }
 
-            _serviceRepository.ConfigurationItemFactory.ParseMessageTemplates = parseMessageTemplates;
+            if (autoLoadExtensions)
+            {
+                ConfigurationItemFactory.ScanForAutoLoadExtensions(LogFactory);
+            }
+
+            _serviceRepository.RegisterMessageTemplateParser(parseMessageTemplates);
         }
 
         /// <summary>
@@ -191,24 +210,11 @@ namespace NLog.Config
         /// </summary>
         /// <param name="nlogConfig"></param>
         /// <returns></returns>
-        private static IList<KeyValuePair<string, string>> CreateUniqueSortedListFromConfig(ILoggingConfigurationElement nlogConfig)
+        private ICollection<KeyValuePair<string, string>> CreateUniqueSortedListFromConfig(ILoggingConfigurationElement nlogConfig)
         {
-            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var configItem in nlogConfig.Values)
-            {
-                if (!string.IsNullOrEmpty(configItem.Key))
-                {
-                    string key = configItem.Key.Trim();
-                    if (!dict.ContainsKey(key))
-                    {
-                        dict[key] = configItem.Value;
-                    }
-                    else
-                    {
-                        InternalLogger.Debug("Skipping duplicate value for 'NLog'. PropertyName={0}. Skips Value={1}. Existing Value={2}", configItem.Key, configItem.Value, dict[key]);
-                    }
-                }
-            }
+            var dict = ValidatedConfigurationElement.Create(nlogConfig, LogFactory).ValueLookup;
+            if (dict.Count == 0)
+                return dict;
 
             var sortedList = new List<KeyValuePair<string, string>>(dict.Count);
             var highPriorityList = new[]
@@ -248,7 +254,15 @@ namespace NLog.Config
                 if (ContainsSubStringIgnoreCase(internalLogFile, "${processdir}", out string processDirToken))
                     internalLogFile = internalLogFile.Replace(processDirToken, System.IO.Path.GetDirectoryName(LogFactory.CurrentAppEnvironment.CurrentProcessFilePath) + System.IO.Path.DirectorySeparatorChar.ToString());
 #endif
-                if (internalLogFile.IndexOf("%", StringComparison.OrdinalIgnoreCase) >= 0)
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
+                if (ContainsSubStringIgnoreCase(internalLogFile, "${commonApplicationDataDir}", out string commonAppDataDirToken))
+                    internalLogFile = internalLogFile.Replace(commonAppDataDirToken, Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + System.IO.Path.DirectorySeparatorChar.ToString());
+                if (ContainsSubStringIgnoreCase(internalLogFile, "${userApplicationDataDir}", out string appDataDirToken))
+                    internalLogFile = internalLogFile.Replace(appDataDirToken, Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + System.IO.Path.DirectorySeparatorChar.ToString());
+                if (ContainsSubStringIgnoreCase(internalLogFile, "${userLocalApplicationDataDir}", out string localapplicationdatadir))
+                    internalLogFile = internalLogFile.Replace(localapplicationdatadir, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + System.IO.Path.DirectorySeparatorChar.ToString());
+#endif
+                if (internalLogFile.IndexOf('%') >= 0)
                     internalLogFile = Environment.ExpandEnvironmentVariables(internalLogFile);
                 return internalLogFile;
             }
@@ -268,15 +282,15 @@ namespace NLog.Config
         /// <summary>
         /// Parse loglevel, but don't throw if exception throwing is disabled
         /// </summary>
-        /// <param name="attributeName">Name of attribute for logging.</param>
-        /// <param name="attributeValue">Value of parse.</param>
-        /// <param name="default">Used if there is an exception</param>
+        /// <param name="propertyName">Name of attribute for logging.</param>
+        /// <param name="propertyValue">Value of parse.</param>
+        /// <param name="fallbackValue">Used if there is an exception</param>
         /// <returns></returns>
-        private LogLevel ParseLogLevelSafe(string attributeName, string attributeValue, LogLevel @default)
+        private LogLevel ParseLogLevelSafe(string propertyName, string propertyValue, LogLevel fallbackValue)
         {
             try
             {
-                var internalLogLevel = LogLevel.FromString(attributeValue?.Trim());
+                var internalLogLevel = LogLevel.FromString(propertyValue?.Trim());
                 return internalLogLevel;
             }
             catch (Exception exception)
@@ -284,13 +298,11 @@ namespace NLog.Config
                 if (exception.MustBeRethrownImmediately())
                     throw;
 
-                const string message = "attribute '{0}': '{1}' isn't valid LogLevel. {2} will be used.";
-                var configException =
-                    new NLogConfigurationException(exception, message, attributeName, attributeValue, @default);
+                var configException = new NLogConfigurationException($"Property '{propertyName}' assigned invalid LogLevel value '{propertyValue}'. Fallback to '{fallbackValue}'", exception);
                 if (MustThrowConfigException(configException))
                     throw configException;
 
-                return @default;
+                return fallbackValue;
             }
         }
 
@@ -324,9 +336,6 @@ namespace NLog.Config
             return false;
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability",
-            "CA2001:AvoidCallingProblematicMethods", MessageId = "System.Reflection.Assembly.LoadFrom",
-            Justification = "Need to load external assembly.")]
         private void ParseExtensionsElement(ValidatedConfigurationElement extensionsElement, string baseDirectory)
         {
             extensionsElement.AssertName("extensions");
@@ -358,8 +367,9 @@ namespace NLog.Config
                     }
                     else
                     {
-                        InternalLogger.Debug("Skipping unknown property {0} for element {1} in section {2}",
-                            childProperty.Key, childItem.Name, extensionsElement.Name);
+                        var configException = new NLogConfigurationException($"Unrecognized value '{childProperty.Key}'='{childProperty.Value}' for element '{childItem.Name}' in section '{extensionsElement.Name}'");
+                        if (MustThrowConfigException(configException))
+                            throw configException;
                     }
                 }
 
@@ -386,7 +396,7 @@ namespace NLog.Config
         {
             try
             {
-                _serviceRepository.ConfigurationItemFactory.RegisterType(Type.GetType(type, true), itemNamePrefix);
+                ConfigurationItemFactory.Default.RegisterType(Type.GetType(type, true), itemNamePrefix);
             }
             catch (Exception exception)
             {
@@ -406,7 +416,7 @@ namespace NLog.Config
             try
             {
                 Assembly asm = AssemblyHelpers.LoadFromPath(assemblyFile, baseDirectory);
-                _serviceRepository.ConfigurationItemFactory.RegisterItemsFromAssembly(asm, prefix);
+                ConfigurationItemFactory.Default.RegisterItemsFromAssembly(asm, prefix);
             }
             catch (Exception exception)
             {
@@ -426,7 +436,7 @@ namespace NLog.Config
             try
             {
                 Assembly asm = AssemblyHelpers.LoadFromName(assemblyName);
-                _serviceRepository.ConfigurationItemFactory.RegisterItemsFromAssembly(asm, prefix);
+                ConfigurationItemFactory.Default.RegisterItemsFromAssembly(asm, prefix);
             }
             catch (Exception exception)
             {
@@ -451,31 +461,35 @@ namespace NLog.Config
                 else if (MatchesName(childProperty.Key, "value") || MatchesName(childProperty.Key, "layout"))
                     variableValue = childProperty.Value;
                 else
-                    InternalLogger.Debug("Skipping unknown property {0} for element {1} in section {2}",
-                        childProperty.Key, variableElement.Name, "variables");
+                {
+                    var configException = new NLogConfigurationException($"Unrecognized value '{childProperty.Key}'='{childProperty.Value}' for element '{variableElement.Name}' in section 'variables'");
+                    if (MustThrowConfigException(configException))
+                        throw configException;
+                }
             }
 
             if (!AssertNonEmptyValue(variableName, "name", variableElement.Name, "variables"))
                 return;
 
-            Layout variableLayout = variableValue != null ? (Layout)ExpandSimpleVariables(variableValue) : null;
-            if (variableLayout == null)
-            {
-                var child = variableElement.ValidChildren.FirstOrDefault();
-                if (child != null)
-                {
-                    variableLayout = TryCreateLayoutInstance(child, typeof(Layout));
-                    if (variableLayout != null)
-                    {
-                        ConfigureFromAttributesAndElements(child, variableLayout);
-                    }
-                }
-            }
+            Layout variableLayout = variableValue is null
+                ? ParseVariableLayoutValue(variableElement)
+                : CreateSimpleLayout(ExpandSimpleVariables(variableValue));
 
-            if (!AssertNotNullValue(variableLayout, "value or text", variableElement.Name, "variables"))
+            if (!AssertNotNullValue(variableLayout, "value", variableElement.Name, "variables"))
                 return;
 
-            Variables[variableName] = variableLayout;
+            InsertParsedConfigVariable(variableName, variableLayout);
+        }
+
+        private Layout ParseVariableLayoutValue(ValidatedConfigurationElement variableElement)
+        {
+            var childElement = variableElement.ValidChildren.FirstOrDefault();
+            if (childElement != null)
+            {
+                return TryCreateLayoutInstance(childElement, typeof(Layout));
+            }
+
+            return null;
         }
 
         private void ParseVariablesElement(ValidatedConfigurationElement variableElement)
@@ -496,43 +510,48 @@ namespace NLog.Config
             foreach (var childProperty in timeElement.Values)
             {
                 if (MatchesName(childProperty.Key, "type"))
+                {
                     timeSourceType = childProperty.Value;
+                }
                 else
-                    InternalLogger.Debug("Skipping unknown property {0} for element {1} in section {2}",
-                        childProperty.Key, timeElement.Name, timeElement.Name);
+                {
+                    var configException = new NLogConfigurationException($"Unrecognized value '{childProperty.Key}'='{childProperty.Value}' for element '{timeElement.Name}'");
+                    if (MustThrowConfigException(configException))
+                        throw configException;
+                }
             }
 
             if (!AssertNonEmptyValue(timeSourceType, "type", timeElement.Name, string.Empty))
                 return;
 
-            TimeSource newTimeSource = _serviceRepository.ConfigurationItemFactory.TimeSources.CreateInstance(timeSourceType);
-            ConfigureObjectFromAttributes(newTimeSource, timeElement, true);
-
-            InternalLogger.Info("Selecting time source {0}", newTimeSource);
-            TimeSource.Current = newTimeSource;
+            TimeSource newTimeSource = FactoryCreateInstance(timeSourceType, ConfigurationItemFactory.Default.TimeSources);
+            if (newTimeSource != null)
+            {
+                ConfigureFromAttributesAndElements(newTimeSource, timeElement);
+                InternalLogger.Info("Selecting time source {0}", newTimeSource);
+                TimeSource.Current = newTimeSource;
+            }
         }
 
         [ContractAnnotation("value:notnull => true")]
-        private static bool AssertNotNullValue(object value, string propertyName, string elementName, string sectionName)
+        private bool AssertNotNullValue(object value, string propertyName, string elementName, string sectionName)
         {
-            if (value != null)
-                return true;
+            if (value is null)
+                return AssertNonEmptyValue(string.Empty, propertyName, elementName, sectionName);
 
-            return AssertNonEmptyValue(string.Empty, propertyName, elementName, sectionName);
+            return true;
         }
 
         [ContractAnnotation("value:null => false")]
-        private static bool AssertNonEmptyValue(string value, string propertyName, string elementName, string sectionName)
+        private bool AssertNonEmptyValue(string value, string propertyName, string elementName, string sectionName)
         {
             if (!StringHelpers.IsNullOrWhiteSpace(value))
                 return true;
 
-            if (LogManager.ThrowConfigExceptions ?? LogManager.ThrowExceptions)
-                throw new NLogConfigurationException(
-                    $"Expected property {propertyName} on element name: {elementName} in section: {sectionName}");
+            var configException = new NLogConfigurationException($"Property '{propertyName}' has blank value, for element '{elementName}' in section '{sectionName}'");
+            if (MustThrowConfigException(configException))
+                throw configException;
 
-            InternalLogger.Warn("Skipping element name: {0} in section: {1} because property {2} is blank", elementName,
-                sectionName, propertyName);
             return false;
         }
 
@@ -572,6 +591,7 @@ namespace NLog.Config
         {
             string minLevel = null;
             string maxLevel = null;
+            string finalMinLevel = null;
             string enableLevels = null;
 
             string ruleName = null;
@@ -579,6 +599,7 @@ namespace NLog.Config
             bool enabled = true;
             bool final = false;
             string writeTargets = null;
+            string filterDefaultAction = null;
             foreach (var childProperty in loggerElement.Values)
             {
                 switch (childProperty.Key?.Trim().ToUpperInvariant())
@@ -590,7 +611,7 @@ namespace NLog.Config
                             ruleName = childProperty.Value;
                         break;
                     case "RULENAME":
-                        ruleName = childProperty.Value; // Legacy Style
+                        ruleName = childProperty.Value;
                         break;
                     case "LOGGER":
                         namePattern = childProperty.Value;
@@ -608,10 +629,8 @@ namespace NLog.Config
                         final = ParseBooleanValue(childProperty.Key, childProperty.Value, false);
                         break;
                     case "LEVEL":
-                        enableLevels = childProperty.Value;
-                        break;
                     case "LEVELS":
-                        enableLevels = StringHelpers.IsNullOrWhiteSpace(childProperty.Value) ? "," : childProperty.Value;
+                        enableLevels = childProperty.Value;
                         break;
                     case "MINLEVEL":
                         minLevel = childProperty.Value;
@@ -619,9 +638,16 @@ namespace NLog.Config
                     case "MAXLEVEL":
                         maxLevel = childProperty.Value;
                         break;
+                    case "FINALMINLEVEL":
+                        finalMinLevel = childProperty.Value;
+                        break;
+                    case "FILTERDEFAULTACTION":
+                        filterDefaultAction = childProperty.Value;
+                        break;
                     default:
-                        InternalLogger.Debug("Skipping unknown property {0} for element {1} in section {2}",
-                            childProperty.Key, loggerElement.Name, "rules");
+                        var configException = new NLogConfigurationException($"Unrecognized value '{childProperty.Key}'='{childProperty.Value}' for element '{loggerElement.Name}' in section 'rules'");
+                        if (MustThrowConfigException(configException))
+                            throw configException;
                         break;
                 }
             }
@@ -637,7 +663,7 @@ namespace NLog.Config
 
             if (!enabled)
             {
-                InternalLogger.Debug("Logging rule {0} with filter `{1}` is disabled", ruleName, namePattern);
+                InternalLogger.Debug("Logging rule {0} with name pattern `{1}` is disabled", ruleName, namePattern);
                 return null;
             }
 
@@ -647,11 +673,22 @@ namespace NLog.Config
                 Final = final,
             };
 
+            if (!string.IsNullOrEmpty(finalMinLevel))
+            {
+                rule.FinalMinLevel = LogLevelFromString(finalMinLevel);
+                if (string.IsNullOrEmpty(enableLevels) && string.IsNullOrEmpty(minLevel))
+                {
+                    minLevel = finalMinLevel;
+                }
+            }
+
             EnableLevelsForRule(rule, enableLevels, minLevel, maxLevel);
 
             ParseLoggingRuleTargets(writeTargets, rule);
 
-            ParseLoggingRuleChildren(loggerElement, rule);
+            ParseLoggingRuleChildren(loggerElement, rule, filterDefaultAction);
+
+            ValidateLoggingRuleFilters(rule);
 
             return rule;
         }
@@ -664,19 +701,13 @@ namespace NLog.Config
                 if (enableLevels.IndexOf('{') >= 0)
                 {
                     SimpleLayout simpleLayout = ParseLevelLayout(enableLevels);
-                    rule.EnableLoggingForLevels(simpleLayout);
+                    rule.EnableLoggingForLevelLayout(simpleLayout);
                 }
                 else
                 {
-                    if (enableLevels.IndexOf(',') >= 0)
+                    foreach (var logLevel in enableLevels.SplitAndTrimTokens(','))
                     {
-                        IEnumerable<LogLevel> logLevels = ParseLevels(enableLevels);
-                        foreach (var logLevel in logLevels)
-                            rule.EnableLoggingForLevel(logLevel);
-                    }
-                    else
-                    {
-                        rule.EnableLoggingForLevel(LogLevelFromString(enableLevels));
+                        rule.EnableLoggingForLevel(LogLevelFromString(logLevel));
                     }
                 }
             }
@@ -688,7 +719,7 @@ namespace NLog.Config
                 {
                     SimpleLayout minLevelLayout = ParseLevelLayout(minLevel);
                     SimpleLayout maxLevelLayout = ParseLevelLayout(maxLevel);
-                    rule.EnableLoggingForRange(minLevelLayout, maxLevelLayout);
+                    rule.EnableLoggingForLevelsLayout(minLevelLayout, maxLevelLayout);
                 }
                 else
                 {
@@ -701,16 +732,9 @@ namespace NLog.Config
 
         private SimpleLayout ParseLevelLayout(string levelLayout)
         {
-            SimpleLayout simpleLayout = !StringHelpers.IsNullOrWhiteSpace(levelLayout) ? new SimpleLayout(levelLayout, _serviceRepository.ConfigurationItemFactory) : null;
+            SimpleLayout simpleLayout = !StringHelpers.IsNullOrWhiteSpace(levelLayout) ? CreateSimpleLayout(levelLayout) : null;
             simpleLayout?.Initialize(this);
             return simpleLayout;
-        }
-
-        private IEnumerable<LogLevel> ParseLevels(string enableLevels)
-        {
-            string[] tokens = enableLevels.SplitAndTrimTokens(',');
-            var logLevels = tokens.Select(LogLevelFromString);
-            return logLevels;
         }
 
         private void ParseLoggingRuleTargets(string writeTargets, LoggingRule rule)
@@ -735,14 +759,14 @@ namespace NLog.Config
             }
         }
 
-        private void ParseLoggingRuleChildren(ValidatedConfigurationElement loggerElement, LoggingRule rule)
+        private void ParseLoggingRuleChildren(ValidatedConfigurationElement loggerElement, LoggingRule rule, string filterDefaultAction = null)
         {
             foreach (var child in loggerElement.ValidChildren)
             {
                 LoggingRule childRule = null;
                 if (child.MatchesName("filters"))
                 {
-                    ParseFilters(rule, child);
+                    ParseLoggingRuleFilters(rule, child, filterDefaultAction);
                 }
                 else if (child.MatchesName("logger") && loggerElement.MatchesName("logger"))
                 {
@@ -754,12 +778,15 @@ namespace NLog.Config
                 }
                 else
                 {
-                    InternalLogger.Debug("Skipping unknown child {0} for element {1} in section {2}", child.Name,
-                        loggerElement.Name, "rules");
+                    var configException = new NLogConfigurationException($"Unrecognized child element '{child.Name}' for element '{loggerElement.Name}' in section 'rules'");
+                    if (MustThrowConfigException(configException))
+                        throw configException;
                 }
 
                 if (childRule != null)
                 {
+                    ValidateLoggingRuleFilters(rule);
+
                     lock (rule.ChildRules)
                     {
                         rule.ChildRules.Add(childRule);
@@ -768,24 +795,38 @@ namespace NLog.Config
             }
         }
 
-        private void ParseFilters(LoggingRule rule, ValidatedConfigurationElement filtersElement)
+        private void ParseLoggingRuleFilters(LoggingRule rule, ValidatedConfigurationElement filtersElement, string filterDefaultAction = null)
         {
             filtersElement.AssertName("filters");
 
-            var defaultActionResult = filtersElement.GetOptionalValue("defaultAction", null);
-            if (defaultActionResult != null)
+            filterDefaultAction = filtersElement.GetOptionalValue("defaultAction", null) ?? filtersElement.GetOptionalValue(nameof(rule.FilterDefaultAction), null) ?? filterDefaultAction;
+            if (filterDefaultAction != null)
             {
-                PropertyHelper.SetPropertyFromString(rule, nameof(rule.DefaultFilterResult), defaultActionResult,
-                    _serviceRepository.ConfigurationItemFactory);
+                SetPropertyValueFromString(rule, nameof(rule.FilterDefaultAction), filterDefaultAction, filtersElement);
             }
 
             foreach (var filterElement in filtersElement.ValidChildren)
             {
-                string name = filterElement.Name;
-
-                Filter filter = _serviceRepository.ConfigurationItemFactory.Filters.CreateInstance(name);
-                ConfigureObjectFromAttributes(filter, filterElement, false);
+                var filterType = filterElement.GetOptionalValue("type", null) ?? filterElement.Name;
+                Filter filter = FactoryCreateInstance(filterType, ConfigurationItemFactory.Default.Filters);
+                ConfigureFromAttributesAndElements(filter, filterElement, true);
                 rule.Filters.Add(filter);
+            }
+        }
+
+        private void ValidateLoggingRuleFilters(LoggingRule rule)
+        {
+            bool overridesDefaultAction = rule.Filters.Count == 0 || rule.FilterDefaultAction != FilterResult.Ignore;
+            for (int i = 0; i < rule.Filters.Count; ++i)
+            {
+                if (rule.Filters[i].Action != FilterResult.Ignore && rule.Filters[i].Action != FilterResult.IgnoreFinal && rule.Filters[i].Action != FilterResult.Neutral)
+                    overridesDefaultAction = true;
+            }
+            if (!overridesDefaultAction)
+            {
+                var configException = new NLogConfigurationException($"LoggingRule where all filters and FilterDefaultAction=Ignore : {rule}");
+                if (MustThrowConfigException(configException))
+                    throw configException;
             }
         }
 
@@ -812,6 +853,7 @@ namespace NLog.Config
                 switch (targetElement.Name?.Trim().ToUpperInvariant())
                 {
                     case "DEFAULT-WRAPPER":
+                    case "TARGETDEFAULTWRAPPER":
                         if (AssertNonEmptyValue(targetTypeName, "type", targetValueName, targetsElement.Name))
                         {
                             defaultWrapperElement = targetElement;
@@ -819,6 +861,7 @@ namespace NLog.Config
                         break;
 
                     case "DEFAULT-TARGET-PARAMETERS":
+                    case "TARGETDEFAULTPARAMETERS":
                         if (AssertNonEmptyValue(targetTypeName, "type", targetValueName, targetsElement.Name))
                         {
                             typeNameToDefaultTargetParameters[targetTypeName.Trim()] = targetElement;
@@ -841,8 +884,9 @@ namespace NLog.Config
                         break;
 
                     default:
-                        InternalLogger.Debug("Skipping unknown element {0} in section {1}", targetValueName,
-                            targetsElement.Name);
+                        var configException = new NLogConfigurationException($"Unrecognized element '{targetValueName}' in section '{targetsElement.Name}'");
+                        if (MustThrowConfigException(configException))
+                            throw configException;
                         break;
                 }
 
@@ -866,25 +910,7 @@ namespace NLog.Config
 
         private Target CreateTargetType(string targetTypeName)
         {
-            Target newTarget = null;
-
-            try
-            {
-                newTarget = _serviceRepository.ConfigurationItemFactory.Targets.CreateInstance(targetTypeName);
-                if (newTarget == null)
-                    throw new NLogConfigurationException($"Factory returned null for target type: {targetTypeName}");
-            }
-            catch (Exception ex)
-            {
-                if (ex.MustBeRethrownImmediately())
-                    throw;
-
-                var configException = new NLogConfigurationException($"Failed to create target type: {targetTypeName}", ex);
-                if (MustThrowConfigException(configException))
-                    throw configException;
-            }
-
-            return newTarget;
+            return FactoryCreateInstance(targetTypeName, ConfigurationItemFactory.Default.Targets);
         }
 
         private void ParseTargetElement(Target target, ValidatedConfigurationElement targetElement,
@@ -916,7 +942,7 @@ namespace NLog.Config
                     continue;
                 }
 
-                SetPropertyFromElement(target, childElement, targetElement);
+                SetPropertyValuesFromElement(target, childElement, targetElement);
             }
         }
 
@@ -930,7 +956,7 @@ namespace NLog.Config
                 var targetName = childElement.GetRequiredValue("name", GetName(wrapper));
 
                 Target newTarget = FindTargetByName(targetName);
-                if (newTarget == null)
+                if (newTarget is null)
                 {
                     var configException = new NLogConfigurationException($"Referenced target '{targetName}' not found.");
                     if (MustThrowConfigException(configException))
@@ -949,10 +975,14 @@ namespace NLog.Config
                 if (newTarget != null)
                 {
                     ParseTargetElement(newTarget, childElement, typeNameToDefaultTargetParameters);
-                    if (newTarget.Name != null)
+                    if (!string.IsNullOrEmpty(newTarget.Name))
                     {
                         // if the new target has name, register it
                         AddTarget(newTarget.Name, newTarget);
+                    }
+                    else if (!string.IsNullOrEmpty(wrapper.Name))
+                    {
+                        newTarget.Name = wrapper.Name + "_wrapped";
                     }
 
                     if (wrapper.WrappedTarget != null)
@@ -991,7 +1021,7 @@ namespace NLog.Config
                 targetName = childElement.GetRequiredValue("name", GetName(compound));
 
                 Target newTarget = FindTargetByName(targetName);
-                if (newTarget == null)
+                if (newTarget is null)
                 {
                     throw new NLogConfigurationException("Referenced target '" + targetName + "' not found.");
                 }
@@ -1038,24 +1068,50 @@ namespace NLog.Config
                     continue;
                 }
 
-                try
-                {
-                    PropertyHelper.SetPropertyFromString(targetObject, childName, ExpandSimpleVariables(childValue),
-                        _serviceRepository.ConfigurationItemFactory);
-                }
-                catch (Exception ex)
-                {
-                    InternalLogger.Warn(ex, "Error when setting '{0}' on attibute '{1}'", childValue, childName);
-                    throw;
-                }
+                SetPropertyValueFromString(targetObject, childName, childValue, element);
             }
         }
 
-        private void SetPropertyFromElement(object o, ValidatedConfigurationElement childElement, ILoggingConfigurationElement parentElement)
+        private void SetPropertyValueFromString(object targetObject, string propertyName, string propertyValue, ValidatedConfigurationElement element)
+        {
+            try
+            {
+                var propertyValueExpanded = ExpandSimpleVariables(propertyValue, out var matchingVariableName);
+                if (matchingVariableName != null && TryLookupDynamicVariable(matchingVariableName, out var matchingLayout))
+                {
+                    if (PropertyHelper.TryGetPropertyInfo(targetObject, propertyName, out var propInfo) && propInfo.PropertyType.IsAssignableFrom(matchingLayout.GetType()))
+                    {
+                        PropertyHelper.SetPropertyValueForObject(targetObject, matchingLayout, propInfo);
+                        return;
+                    }
+                }
+
+                PropertyHelper.SetPropertyFromString(targetObject, propertyName, propertyValueExpanded, ConfigurationItemFactory.Default);
+            }
+            catch (NLogConfigurationException ex)
+            {
+                if (MustThrowConfigException(ex))
+                    throw;
+            }
+            catch (Exception ex)
+            {
+                if (ex.MustBeRethrownImmediately())
+                    throw;
+
+                var configException = new NLogConfigurationException($"'{targetObject?.GetType()?.Name}' cannot assign property '{propertyName}'='{propertyValue}' in section '{element.Name}'. Error: {ex.Message}", ex);
+                if (MustThrowConfigException(configException))
+                    throw;
+            }
+        }
+
+        private void SetPropertyValuesFromElement(object o, ValidatedConfigurationElement childElement, ILoggingConfigurationElement parentElement)
         {
             if (!PropertyHelper.TryGetPropertyInfo(o, childElement.Name, out var propInfo))
             {
-                InternalLogger.Debug("Skipping unknown element {0} in section {1}. Not matching any property on {2} - {3}", childElement.Name, parentElement.Name, o, o?.GetType());
+                var configException = new NLogConfigurationException($"'{o?.GetType()?.Name}' cannot assign unknown property '{childElement.Name}' in section '{parentElement.Name}'");
+                if (MustThrowConfigException(configException))
+                    throw configException;
+
                 return;
             }
 
@@ -1074,7 +1130,8 @@ namespace NLog.Config
                 return;
             }
 
-            SetItemFromElement(o, propInfo, childElement);
+            object item = propInfo.GetValue(o, null);
+            ConfigureFromAttributesAndElements(item, childElement);
         }
 
         private bool AddArrayItemFromElement(object o, PropertyInfo propInfo, ValidatedConfigurationElement element)
@@ -1108,22 +1165,21 @@ namespace NLog.Config
         {
             object arrayItem = TryCreateLayoutInstance(element, elementType);
             // arrayItem is not a layout
-            if (arrayItem == null)
+            if (arrayItem is null)
+            {
                 arrayItem = _serviceRepository.GetService(elementType);
-
-            ConfigureObjectFromAttributes(arrayItem, element, true);
-            ConfigureObjectFromElement(arrayItem, element);
+                ConfigureFromAttributesAndElements(arrayItem, element);
+            }
             return arrayItem;
         }
 
         private bool SetLayoutFromElement(object o, PropertyInfo propInfo, ValidatedConfigurationElement element)
         {
             var layout = TryCreateLayoutInstance(element, propInfo.PropertyType);
-
             // and is a Layout and 'type' attribute has been specified
             if (layout != null)
             {
-                SetItemOnProperty(o, propInfo, element, layout);
+                PropertyHelper.SetPropertyValueForObject(o, layout, propInfo);
                 return true;
             }
 
@@ -1132,86 +1188,166 @@ namespace NLog.Config
 
         private bool SetFilterFromElement(object o, PropertyInfo propInfo, ValidatedConfigurationElement element)
         {
-            var type = propInfo.PropertyType;
-
-            Filter filter = TryCreateFilterInstance(element, type);
+            Filter filter = TryCreateFilterInstance(element, propInfo.PropertyType);
             // and is a Filter and 'type' attribute has been specified
             if (filter != null)
             {
-                SetItemOnProperty(o, propInfo, element, filter);
+                PropertyHelper.SetPropertyValueForObject(o, filter, propInfo);
                 return true;
             }
 
             return false;
         }
 
+        private SimpleLayout CreateSimpleLayout(string layoutText)
+        {
+            return new SimpleLayout(layoutText, ConfigurationItemFactory.Default, LogFactory.ThrowConfigExceptions);
+        }
+
         private Layout TryCreateLayoutInstance(ValidatedConfigurationElement element, Type type)
         {
-            return TryCreateInstance(element, type, _serviceRepository.ConfigurationItemFactory.Layouts);
+            // Check if Layout type
+            if (!typeof(Layout).IsAssignableFrom(type))
+                return null;
+
+            // Check if the 'type' attribute has been specified
+            string classType = element.GetConfigItemTypeAttribute();
+            if (classType is null)
+                return null;
+
+            var expandedClassType = ExpandSimpleVariables(classType, out var matchingVariableName);
+            if (matchingVariableName != null && TryLookupDynamicVariable(matchingVariableName, out var matchingLayout))
+            {
+                if (type.IsAssignableFrom(matchingLayout.GetType()))
+                {
+                    return matchingLayout;
+                }
+            }
+
+            var layoutInstance = FactoryCreateInstance(expandedClassType, ConfigurationItemFactory.Default.Layouts);
+            if (layoutInstance != null)
+            {
+                ConfigureFromAttributesAndElements(layoutInstance, element);
+                return layoutInstance;
+            }
+
+            return null;
         }
 
         private Filter TryCreateFilterInstance(ValidatedConfigurationElement element, Type type)
         {
-            return TryCreateInstance(element, type, _serviceRepository.ConfigurationItemFactory.Filters);
+            var filter = TryCreateInstance(element, type, ConfigurationItemFactory.Default.Filters);
+            if (filter != null)
+            {
+                ConfigureFromAttributesAndElements(filter, element);
+                return filter;
+            }
+
+            return null;
         }
 
         private T TryCreateInstance<T>(ValidatedConfigurationElement element, Type type, INamedItemFactory<T, Type> factory)
             where T : class
         {
             // Check if correct type
-            if (!IsAssignableFrom<T>(type))
+            if (!typeof(T).IsAssignableFrom(type))
                 return null;
 
             // Check if the 'type' attribute has been specified
-            string layoutTypeName = element.GetConfigItemTypeAttribute();
-            if (layoutTypeName == null)
+            string classType = element.GetConfigItemTypeAttribute();
+            if (classType is null)
                 return null;
 
-            return factory.CreateInstance(ExpandSimpleVariables(layoutTypeName));
+            return FactoryCreateInstance(classType, factory);
         }
 
-        private static bool IsAssignableFrom<T>(Type type)
+        private T FactoryCreateInstance<T>(string classType, INamedItemFactory<T, Type> factory) where T : class
         {
-            return typeof(T).IsAssignableFrom(type);
-        }
+            T newInstance = null;
 
-        private void SetItemOnProperty(object o, PropertyInfo propInfo, ValidatedConfigurationElement element, object properyValue)
-        {
-            ConfigureFromAttributesAndElements(element, properyValue);
-            propInfo.SetValue(o, properyValue, null);
-        }
-
-        private void SetItemFromElement(object o, PropertyInfo propInfo, ValidatedConfigurationElement element)
-        {
-            object item = propInfo.GetValue(o, null);
-            ConfigureFromAttributesAndElements(element, item);
-        }
-
-        private void ConfigureFromAttributesAndElements(ValidatedConfigurationElement element, object item)
-        {
-            ConfigureObjectFromAttributes(item, element, true);
-            ConfigureObjectFromElement(item, element);
-        }
-
-        private void ConfigureObjectFromElement(object targetObject, ValidatedConfigurationElement element)
-        {
-            foreach (var child in element.ValidChildren)
+            try
             {
-                SetPropertyFromElement(targetObject, child, element);
+                classType = ExpandSimpleVariables(classType);
+                if (classType.Contains(','))
+                {
+                    // Possible specification of assembly-name detected
+                    if (factory.TryCreateInstance(classType, out newInstance) && newInstance != null)
+                        return newInstance;
+
+                    // Attempt to load the assembly name extracted from the prefix
+                    classType = RegisterExtensionFromAssemblyName(classType);
+                }
+
+                newInstance = factory.CreateInstance(classType);
+                if (newInstance is null)
+                {
+                    throw new NLogConfigurationException($"Factory returned null for {typeof(T).Name} of type: {classType}");
+                }
+            }
+            catch (NLogConfigurationException configException)
+            {
+                if (MustThrowConfigException(configException))
+                    throw;
+            }
+            catch (Exception ex)
+            {
+                if (ex.MustBeRethrownImmediately())
+                    throw;
+
+                var configException = new NLogConfigurationException($"Failed to create {typeof(T).Name} of type: {classType}", ex);
+                if (MustThrowConfigException(configException))
+                    throw configException;
+            }
+
+            return newInstance;
+        }
+
+        private string RegisterExtensionFromAssemblyName(string classType)
+        {
+            var assemblyName = classType.Substring(classType.IndexOf(',') + 1).Trim();
+            if (!string.IsNullOrEmpty(assemblyName))
+            {
+                try
+                {
+                    InternalLogger.Debug("Loading Assembly-Name '{0}' for type: {1}", assemblyName, classType);
+                    ParseExtensionWithAssembly(assemblyName, string.Empty);
+                    return classType.Substring(0, classType.IndexOf(',')).Trim() + ", " + assemblyName; // uniform format
+                }
+                catch (Exception ex)
+                {
+                    if (ex.MustBeRethrownImmediately())
+                        throw;
+                }
+            }
+
+            return classType;
+        }
+
+        private void ConfigureFromAttributesAndElements(object targetObject, ValidatedConfigurationElement element, bool ignoreTypeProperty = true)
+        {
+            ConfigureObjectFromAttributes(targetObject, element, ignoreTypeProperty);
+
+            foreach (var childElement in element.ValidChildren)
+            {
+                SetPropertyValuesFromElement(targetObject, childElement, element);
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability",
-            "CA2000:Dispose objects before losing scope", Justification = "Target is disposed elsewhere.")]
         private static Target WrapWithAsyncTargetWrapper(Target target)
         {
-#if !NET3_5
+#if !NET35
             if (target is AsyncTaskTarget)
             {
                 InternalLogger.Debug("Skip wrapping target '{0}' with AsyncTargetWrapper", target.Name);
                 return target;
             }
 #endif
+
+            if (target is AsyncTargetWrapper)
+            {
+                InternalLogger.Debug("Skip wrapping target '{0}' with AsyncTargetWrapper", target.Name);
+                return target;
+            }
 
             var asyncTargetWrapper = new AsyncTargetWrapper();
             asyncTargetWrapper.WrappedTarget = target;
@@ -1228,7 +1364,7 @@ namespace NLog.Config
             string wrapperTypeName = defaultWrapperElement.GetConfigItemTypeAttribute("targets");
             Target wrapperTargetInstance = CreateTargetType(wrapperTypeName);
             WrapperTargetBase wtb = wrapperTargetInstance as WrapperTargetBase;
-            if (wtb == null)
+            if (wtb is null)
             {
                 throw new NLogConfigurationException("Target type specified on <default-wrapper /> is not a wrapper.");
             }
@@ -1237,14 +1373,14 @@ namespace NLog.Config
             while (wtb.WrappedTarget != null)
             {
                 wtb = wtb.WrappedTarget as WrapperTargetBase;
-                if (wtb == null)
+                if (wtb is null)
                 {
                     throw new NLogConfigurationException(
                         "Child target type specified on <default-wrapper /> is not a wrapper.");
                 }
             }
 
-#if !NET3_5
+#if !NET35
             if (target is AsyncTaskTarget && wrapperTargetInstance is AsyncTargetWrapper && ReferenceEquals(wrapperTargetInstance, wtb))
             {
                 InternalLogger.Debug("Skip wrapping target '{0}' with AsyncTargetWrapper", target.Name);
@@ -1279,7 +1415,7 @@ namespace NLog.Config
                 if (exception.MustBeRethrownImmediately())
                     throw;
 
-                var configException = new NLogConfigurationException(exception, $"'{propertyName}' hasn't a valid boolean value '{value}'. {defaultValue} will be used");
+                var configException = new NLogConfigurationException($"'{propertyName}' hasn't a valid boolean value '{value}'. {defaultValue} will be used", exception);
                 if (MustThrowConfigException(configException))
                     throw configException;
                 return defaultValue;
@@ -1344,8 +1480,9 @@ namespace NLog.Config
             {
                 if (element is ValidatedConfigurationElement validConfig)
                     return validConfig;
-                else
-                    return new ValidatedConfigurationElement(element, logFactory.ThrowConfigExceptions ?? logFactory.ThrowExceptions);
+
+                bool throwConfigExceptions = (logFactory.ThrowConfigExceptions ?? logFactory.ThrowExceptions) || (LogManager.ThrowConfigExceptions ?? LogManager.ThrowExceptions);
+                return new ValidatedConfigurationElement(element, throwConfigExceptions);
             }
 
             public ValidatedConfigurationElement(ILoggingConfigurationElement element, bool throwConfigExceptions)
@@ -1364,36 +1501,37 @@ namespace NLog.Config
             {
                 get
                 {
-                    if (_validChildren != null)
-                        return _validChildren;
-                    else
+                    if (_validChildren is null)
                         return YieldAndCacheValidChildren();
+                    else
+                        return _validChildren;
                 }
             }
 
             IEnumerable<ValidatedConfigurationElement> YieldAndCacheValidChildren()
             {
+                IList<ValidatedConfigurationElement> validChildren = null;
                 foreach (var child in _element.Children)
                 {
-                    _validChildren = _validChildren ?? new List<ValidatedConfigurationElement>();
+                    validChildren = validChildren ?? new List<ValidatedConfigurationElement>();
                     var validChild = new ValidatedConfigurationElement(child, _throwConfigExceptions);
-                    _validChildren.Add(validChild);
+                    validChildren.Add(validChild);
                     yield return validChild;
                 }
-                _validChildren = _validChildren ?? ArrayHelper.Empty<ValidatedConfigurationElement>();
+                _validChildren = validChildren ?? ArrayHelper.Empty<ValidatedConfigurationElement>();
             }
 
             public IEnumerable<KeyValuePair<string, string>> Values => ValueLookup;
 
             /// <remarks>
-            /// Explicit cast because net3_5 doesn't support covariance.
+            /// Explicit cast because NET35 doesn't support covariance.
             /// </remarks>
             IEnumerable<ILoggingConfigurationElement> ILoggingConfigurationElement.Children => ValidChildren.Cast<ILoggingConfigurationElement>();
 
             public string GetRequiredValue(string attributeName, string section)
             {
                 string value = GetOptionalValue(attributeName, null);
-                if (value == null)
+                if (value is null)
                 {
                     throw new NLogConfigurationException($"Expected {attributeName} on {Name} in {section}");
                 }
@@ -1442,6 +1580,11 @@ namespace NLog.Config
                     throw new NLogConfigurationException(StringHelpers.Join(Environment.NewLine, warnings));
                 }
                 return valueLookup ?? EmptyDefaultDictionary;
+            }
+
+            public override string ToString()
+            {
+                return Name;
             }
         }
     }

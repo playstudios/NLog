@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -42,6 +42,8 @@ namespace NLog.Internal
     /// </summary>
     internal class SingleCallContinuation
     {
+        internal static readonly AsyncContinuation Completed = new SingleCallContinuation(null).CompletedFunction;
+
         private AsyncContinuation _asyncContinuation;
 
         /// <summary>
@@ -62,10 +64,7 @@ namespace NLog.Internal
             try
             {
                 var cont = Interlocked.Exchange(ref _asyncContinuation, null);
-                if (cont != null)
-                {
-                    cont(exception);
-                }
+                cont?.Invoke(exception);
             }
             catch (Exception ex)
             {
@@ -76,6 +75,11 @@ namespace NLog.Internal
                     throw;
                 }       
             }
+        }
+
+        private void CompletedFunction(Exception exception)
+        {
+            // Completed, nothing to do
         }
     }
 }

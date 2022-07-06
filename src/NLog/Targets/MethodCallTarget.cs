@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -41,17 +41,16 @@ namespace NLog.Targets
     /// <summary>
     /// Calls the specified static method on each log message and passes contextual parameters to it.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/MethodCall-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/MethodCall-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/MethodCall/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
@@ -103,9 +102,7 @@ namespace NLog.Targets
             _logEventAction = logEventAction;
         }
 
-        /// <summary>
-        /// Initializes the target.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
@@ -118,7 +115,7 @@ namespace NLog.Targets
                 if (targetType != null)
                 {
                     var methodInfo = targetType.GetMethod(MethodName);
-                    if (methodInfo == null)
+                    if (methodInfo is null)
                     {
                         throw new NLogConfigurationException($"MethodCallTarget: MethodName={MethodName} not found in ClassName={ClassName} - it should be static");
                     }
@@ -132,7 +129,7 @@ namespace NLog.Targets
                     throw new NLogConfigurationException($"MethodCallTarget: failed to get type from ClassName={ClassName}");
                 }
             }
-            else if (_logEventAction == null)
+            else if (_logEventAction is null)
             {
                 throw new NLogConfigurationException($"MethodCallTarget: Missing configuration of ClassName and MethodName");
             }
@@ -199,7 +196,7 @@ namespace NLog.Targets
             }
             else
             {
-                InternalLogger.Trace("No invoke because class/method was not found or set");
+                InternalLogger.Trace("{0}: No invoke because class/method was not found or set", this);
             }
         }
     }

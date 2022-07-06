@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -38,6 +38,7 @@ using NLog.Internal.Fakeables;
 
 namespace NLog.UnitTests.Mocks
 {
+    [Obsolete("For unit testing only. Marked obsolete on NLog 5.0")]
     public class AppDomainMock : IAppDomain
     {
         public AppDomainMock(string baseDirectory)

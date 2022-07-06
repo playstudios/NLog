@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -43,7 +43,7 @@ namespace NLog.Internal
     internal class ReusableAsyncLogEventList : ReusableObjectCreator<IList<AsyncLogEventInfo>>
     {
         public ReusableAsyncLogEventList(int capacity)
-            :base(new List<AsyncLogEventInfo>(capacity), (l) => l.Clear())
+            :base(capacity, (cap) => new List<AsyncLogEventInfo>(cap), (l) => l.Clear())
         {
         }
     }

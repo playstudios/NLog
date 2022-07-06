@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -31,7 +31,7 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-#if !NETSTANDARD1_0
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
 
 namespace NLog.Targets
 {
@@ -41,16 +41,16 @@ namespace NLog.Targets
     /// <summary>
     /// Writes log messages to the attached managed debugger.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/NLog/NLog/wiki/Debugger-target">See NLog Wiki</a>
+    /// </remarks>
+    /// <seealso href="https://github.com/NLog/NLog/wiki/Debugger-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/Debugger/NLog.config" />
-    /// <p>
-    /// This assumes just one target and a single rule. More configuration
-    /// options are described <a href="config.html">here</a>.
-    /// </p>
     /// <p>
     /// To set up the log target programmatically use code like this:
     /// </p>
@@ -67,7 +67,6 @@ namespace NLog.Targets
         /// </remarks>
         public DebuggerTarget() : base()
         {
-            OptimizeBufferReuse = true;
         }
 
         /// <summary>
@@ -82,15 +81,13 @@ namespace NLog.Targets
             Name = name;
         }
 
-        /// <summary>
-        /// Initializes the target.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
             if (!Debugger.IsLogging())
             {
-                InternalLogger.Debug("Debugger(Name={0}): System.Diagnostics.Debugger.IsLogging()==false. Output has been disabled.", Name);
+                InternalLogger.Debug("{0}: System.Diagnostics.Debugger.IsLogging()==false. Output has been disabled.", this);
             }
 
             if (Header != null)
@@ -99,9 +96,7 @@ namespace NLog.Targets
             }
         }
 
-        /// <summary>
-        /// Closes the target and releases any unmanaged resources.
-        /// </summary>
+        /// <inheritdoc/>
         protected override void CloseTarget()
         {
             if (Footer != null)
@@ -112,27 +107,17 @@ namespace NLog.Targets
             base.CloseTarget();
         }
 
-        /// <summary>
-        /// Writes the specified logging event to the attached debugger.
-        /// </summary>
-        /// <param name="logEvent">The logging event.</param>
+        /// <inheritdoc/>
         protected override void Write(LogEventInfo logEvent)
         {
             if (Debugger.IsLogging())
             {
                 string logMessage;
-                if (OptimizeBufferReuse)
+                using (var localTarget = ReusableLayoutBuilder.Allocate())
                 {
-                    using (var localTarget = ReusableLayoutBuilder.Allocate())
-                    {
-                        Layout.RenderAppendBuilder(logEvent, localTarget.Result);
-                        localTarget.Result.Append('\n');
-                        logMessage = localTarget.Result.ToString();
-                    }
-                }
-                else
-                {
-                    logMessage = RenderLogEvent(Layout, logEvent) + "\n";
+                    Layout.Render(logEvent, localTarget.Result);
+                    localTarget.Result.Append('\n');
+                    logMessage = localTarget.Result.ToString();
                 }
 
                 Debugger.Log(logEvent.Level.Ordinal, logEvent.LoggerName, logMessage);

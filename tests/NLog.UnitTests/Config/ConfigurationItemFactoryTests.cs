@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -45,9 +45,7 @@ namespace NLog.UnitTests.Config
         public void ConfigurationItemFactoryDefaultTest()
         {
             var itemFactory = new ConfigurationItemFactory();
-#pragma warning disable CS0618 // Type or member is obsolete
             Assert.IsType<DebugTarget>(itemFactory.CreateInstance(typeof(DebugTarget)));
-#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         [Fact]
@@ -60,29 +58,27 @@ namespace NLog.UnitTests.Config
         }
 
         [Fact]
+        public void ConfigurationItemFactoryFailsTest()
+        {
+            var cif = new ConfigurationItemFactory();
+            var ex = Assert.ThrowsAny<Exception>(() => cif.Targets.CreateInstance("Debug-Target") as DebugTarget);
+            Assert.Contains("Debug-Target", ex.Message);
+        }
+
+        [Fact]
         public void ConfigurationItemFactoryUsesSuppliedDelegateToResolveObject()
         {
             var cif = new ConfigurationItemFactory();
             cif.RegisterType(typeof(DebugTarget), string.Empty);
             List<Type> resolvedTypes = new List<Type>();
-#pragma warning disable CS0618 // Type or member is obsolete
             cif.CreateInstance = t => { resolvedTypes.Add(t); return Activator.CreateInstance(t); };
-#pragma warning restore CS0618 // Type or member is obsolete
             Target target = cif.Targets.CreateInstance("Debug");
             Assert.NotNull(target);
             Assert.Single(resolvedTypes);
             Assert.Equal(typeof(DebugTarget), resolvedTypes[0]);
         }
 
-#if !NETSTANDARD
-
-        [Fact]
-        public void ExtendedTargetTest()
-        {
-            var targets = ConfigurationItemFactory.Default.Targets;
-
-            AssertInstance(targets, "MSMQ", "MessageQueueTarget");
-        }
+#if !NETSTANDARD && !MONO
 
         [Fact]
         public void ExtendedLayoutRendererTest()

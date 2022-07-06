@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -86,7 +86,7 @@ namespace NLog.Internal.NetworkSenders
         }
 
         /// <summary>
-        /// Flushes any pending messages and invokes a continuation.
+        /// Flushes any pending messages and invokes the <paramref name="continuation"/> on completion.
         /// </summary>
         /// <param name="continuation">The continuation.</param>
         public void FlushAsync(AsyncContinuation continuation)
@@ -103,8 +103,16 @@ namespace NLog.Internal.NetworkSenders
         /// <param name="asyncContinuation">The asynchronous continuation.</param>
         public void Send(byte[] bytes, int offset, int length, AsyncContinuation asyncContinuation)
         {
-            LastSendTime = Interlocked.Increment(ref currentSendTime);
-            DoSend(bytes, offset, length, asyncContinuation);
+            try
+            {
+                LastSendTime = Interlocked.Increment(ref currentSendTime);
+                DoSend(bytes, offset, length, asyncContinuation);
+            }
+            catch (Exception ex)
+            {
+                InternalLogger.Error(ex, "NetworkTarget: Error sending network request");
+                asyncContinuation(ex);
+            }
         }
 
         /// <summary>
@@ -117,14 +125,14 @@ namespace NLog.Internal.NetworkSenders
         }
 
         /// <summary>
-        /// Performs sender-specific initialization.
+        /// Initializes resources for the protocol specific implementation.
         /// </summary>
         protected virtual void DoInitialize()
         {
         }
 
         /// <summary>
-        /// Performs sender-specific close operation.
+        /// Closes resources for the protocol specific implementation.
         /// </summary>
         /// <param name="continuation">The continuation.</param>
         protected virtual void DoClose(AsyncContinuation continuation)
@@ -133,7 +141,7 @@ namespace NLog.Internal.NetworkSenders
         }
 
         /// <summary>
-        /// Performs sender-specific flush.
+        /// Performs the flush and invokes the <paramref name="continuation"/> on completion.
         /// </summary>
         /// <param name="continuation">The continuation.</param>
         protected virtual void DoFlush(AsyncContinuation continuation)
@@ -142,41 +150,45 @@ namespace NLog.Internal.NetworkSenders
         }
 
         /// <summary>
-        /// Actually sends the given text over the specified protocol.
+        /// Sends the payload using the protocol specific implementation.
         /// </summary>
         /// <param name="bytes">The bytes to be sent.</param>
         /// <param name="offset">Offset in buffer.</param>
         /// <param name="length">Number of bytes to send.</param>
         /// <param name="asyncContinuation">The async continuation to be invoked after the buffer has been sent.</param>
-        /// <remarks>To be overridden in inheriting classes.</remarks>
         protected abstract void DoSend(byte[] bytes, int offset, int length, AsyncContinuation asyncContinuation);
 
         /// <summary>
-        /// Parses the URI into an endpoint address.
+        /// Parses the URI into an IP address.
         /// </summary>
         /// <param name="uri">The URI to parse.</param>
         /// <param name="addressFamily">The address family.</param>
         /// <returns>Parsed endpoint.</returns>
-        protected virtual EndPoint ParseEndpointAddress(Uri uri, AddressFamily addressFamily)
+        protected virtual IPAddress ResolveIpAddress(Uri uri, AddressFamily addressFamily)
         {
             switch (uri.HostNameType)
             {
                 case UriHostNameType.IPv4:
                 case UriHostNameType.IPv6:
-                    return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
+                    return IPAddress.Parse(uri.Host);
 
                 default:
                     {
-#if NETSTANDARD1_0
-                        var addresses = Dns.GetHostAddressesAsync(uri.Host).Result;
+#if !NETSTANDARD1_3 && !NETSTANDARD1_5
+                        var addresses = Dns.GetHostEntry(uri.Host).AddressList; // Dns.GetHostEntry returns IPv6 + IPv4 addresses, but Dns.GetHostAddresses() might only return IPv6 addresses
 #else
-                        var addresses = Dns.GetHostEntry(uri.Host).AddressList;
+                        var addresses = Dns.GetHostEntryAsync(uri.Host).ConfigureAwait(false).GetAwaiter().GetResult().AddressList;
 #endif
+                        if (addressFamily == AddressFamily.Unspecified && addresses.Length > 1)
+                        {
+                            Array.Sort(addresses, IPAddressComparer.Default);   // Prioritize IPv4 addresses over IPv6, unless explicitly specified
+                        }
+
                         foreach (var addr in addresses)
                         {
-                            if (addr.AddressFamily == addressFamily || addressFamily == AddressFamily.Unspecified)
+                            if (addr.AddressFamily == addressFamily || (addressFamily == AddressFamily.Unspecified && (addr.AddressFamily == AddressFamily.InterNetwork || addr.AddressFamily == AddressFamily.InterNetworkV6)))
                             {
-                                return new IPEndPoint(addr, uri.Port);
+                                return addr;
                             }
                         }
 
@@ -185,8 +197,9 @@ namespace NLog.Internal.NetworkSenders
             }
         }
 
-        public virtual void CheckSocket()
+        public virtual ISocket CheckSocket()
         {
+            return null;
         }
 
         private void Dispose(bool disposing)
@@ -194,6 +207,16 @@ namespace NLog.Internal.NetworkSenders
             if (disposing)
             {
                 Close(ex => { });
+            }
+        }
+
+        private sealed class IPAddressComparer : System.Collections.Generic.IComparer<IPAddress>
+        {
+            public static readonly IPAddressComparer Default = new IPAddressComparer();
+
+            public int Compare(IPAddress x, IPAddress y)
+            {
+                return ((int)x.AddressFamily).CompareTo((int)y.AddressFamily);
             }
         }
     }

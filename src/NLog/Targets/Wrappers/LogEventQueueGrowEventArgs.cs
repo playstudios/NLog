@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,7 +44,7 @@ namespace NLog.Targets.Wrappers
     public class LogEventQueueGrowEventArgs : EventArgs
     {
         /// <summary>
-        /// Contains <see cref="AsyncRequestQueue"/> items count and new queue size.
+        /// Initializes a new instance of the <see cref="LogEventQueueGrowEventArgs" /> class.
         /// </summary>
         /// <param name="newQueueSize">Required queue size</param>
         /// <param name="requestsCount">Current queue size</param>

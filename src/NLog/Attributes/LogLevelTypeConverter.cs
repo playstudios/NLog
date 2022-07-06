@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -51,9 +51,10 @@ namespace NLog.Attributes
         /// <inheritdoc/>
         public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
         {
-            if (value?.GetType() == typeof(string))
-                return LogLevel.FromString(value.ToString());
-            else if (IsNumericType(value?.GetType()))
+            var valueType = value?.GetType();
+            if (typeof(string).Equals(valueType))
+                return LogLevel.FromString(value?.ToString());
+            else if (IsNumericType(valueType))
                 return LogLevel.FromOrdinal(Convert.ToInt32(value));
             else 
                 return base.ConvertFrom(context, culture, value);
@@ -80,12 +81,19 @@ namespace NLog.Attributes
 
         private static bool IsNumericType(Type sourceType)
         {
-            return sourceType == typeof(int) ||
-                sourceType == typeof(uint) ||
-                sourceType == typeof(long) ||
-                sourceType == typeof(ulong) ||
-                sourceType == typeof(short) ||
-                sourceType == typeof(ushort);
+            if (typeof(int).Equals(sourceType))
+                return true;
+            if (typeof(uint).Equals(sourceType))
+                return true;
+            if (typeof(long).Equals(sourceType))
+                return true;
+            if (typeof(ulong).Equals(sourceType))
+                return true;
+            if (typeof(short).Equals(sourceType))
+                return true;
+            if (typeof(ushort).Equals(sourceType))
+                return true;
+            return false;
         }
     }
 }

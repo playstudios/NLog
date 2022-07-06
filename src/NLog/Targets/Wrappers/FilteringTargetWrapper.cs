@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -44,17 +44,19 @@ namespace NLog.Targets.Wrappers
     /// <summary>
     /// Filters log entries based on a condition.
     /// </summary>
+    /// <remarks>
+    /// <a href="https://github.com/nlog/nlog/wiki/FilteringWrapper-target">See NLog Wiki</a>
+    /// </remarks>
     /// <seealso href="https://github.com/nlog/nlog/wiki/FilteringWrapper-target">Documentation on NLog Wiki</seealso>
     /// <example>
     /// <p>This example causes the messages not contains the string '1' to be ignored.</p>
     /// <p>
-    /// To set up the target in the <a href="config.html">configuration file</a>, 
+    /// To set up the target in the <a href="https://github.com/NLog/NLog/wiki/Configuration-file">configuration file</a>, 
     /// use the following syntax:
     /// </p>
     /// <code lang="XML" source="examples/targets/Configuration File/FilteringWrapper/NLog.config" />
     /// <p>
-    /// The above examples assume just one target and a single rule. See below for
-    /// a programmatic configuration that's equivalent to the above config file:
+    /// To set up the log target programmatically use code like this:
     /// </p>
     /// <code lang="C#" source="examples/targets/Configuration API/FilteringWrapper/Simple/Example.cs" />
     /// </example>
@@ -106,17 +108,6 @@ namespace NLog.Targets.Wrappers
         [RequiredParameter]
         public Filter Filter { get; set; }
 
-        /// <inheritdoc/>
-        protected override void InitializeTarget()
-        {
-            base.InitializeTarget();
-
-            if (!OptimizeBufferReuse && WrappedTarget != null && WrappedTarget.OptimizeBufferReuse)
-            {
-                OptimizeBufferReuse = GetType() == typeof(FilteringTargetWrapper); // Class not sealed, reduce breaking changes
-            }
-        }
-
         /// <summary>
         /// Checks the condition against the passed log event.
         /// If the condition is met, the log event is forwarded to
@@ -129,17 +120,16 @@ namespace NLog.Targets.Wrappers
             {
                 WrappedTarget.WriteAsyncLogEvent(logEvent);
             }
-            else
-            {
-                logEvent.Continuation(null);
-            }
         }
 
         /// <inheritdoc/>
         protected override void Write(IList<AsyncLogEventInfo> logEvents)
         {
-            var filterLogEvents = logEvents.Filter(Filter, ShouldLogEvent);
-            WrappedTarget.WriteAsyncLogEvents(filterLogEvents);
+            var filterLogEvents = logEvents.Filter(Filter, (logEvent, filter) => ShouldLogEvent(logEvent, filter));
+            if (filterLogEvents.Count > 0)
+            {
+                WrappedTarget.WriteAsyncLogEvents(filterLogEvents);
+            }
         }
 
         private static bool ShouldLogEvent(AsyncLogEventInfo logEvent, Filter filter)
@@ -158,11 +148,11 @@ namespace NLog.Targets.Wrappers
 
         private static ConditionBasedFilter CreateFilter(ConditionExpression value)
         {
-            if (value == null)
+            if (value is null)
             {
                 return null;
             }
-            return new ConditionBasedFilter { Condition = value, DefaultFilterResult = FilterResult.Ignore };
+            return new ConditionBasedFilter { Condition = value, FilterDefaultAction = FilterResult.Ignore };
         }
     }
 }

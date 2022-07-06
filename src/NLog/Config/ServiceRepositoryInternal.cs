@@ -1,5 +1,5 @@
 ﻿// 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -48,16 +48,7 @@ namespace NLog.Config
         private readonly Dictionary<Type, ConfigurationItemCreator> _creatorMap = new Dictionary<Type, ConfigurationItemCreator>();
         private readonly Dictionary<Type, CompiledConstructor> _lateBoundMap = new Dictionary<Type, CompiledConstructor>();
         private readonly object _lockObject = new object();
-        private ConfigurationItemFactory _localItemFactory;
-        public event EventHandler<RepositoryUpdateEventArgs> TypeRegistered;
-
-        public override ConfigurationItemFactory ConfigurationItemFactory
-        {
-            get => _localItemFactory ?? (_localItemFactory = new ConfigurationItemFactory(this, ConfigurationItemFactory.Default, ArrayHelper.Empty<Assembly>()));
-            internal set => _localItemFactory = value;
-        }
-
-        internal override ConfigurationItemCreator ConfigurationItemCreator { get; set; }
+        public event EventHandler<ServiceRepositoryUpdateEventArgs> TypeRegistered;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ServiceRepositoryInternal"/> class.
@@ -67,17 +58,15 @@ namespace NLog.Config
             if (resetGlobalCache)
                 ConfigurationItemFactory.Default = null;    //build new global factory
 
-            ConfigurationItemCreator = GetService;
-
             this.RegisterDefaults();
             // Maybe also include active TimeSource ? Could also be done with LogFactory extension-methods
         }
 
         public override void RegisterService(Type type, object instance)
         {
-            if (type == null)
+            if (type is null)
                 throw new ArgumentNullException(nameof(type));
-            if (instance == null)
+            if (instance is null)
                 throw new ArgumentNullException(nameof(instance));
 
             lock (_lockObject)
@@ -85,17 +74,28 @@ namespace NLog.Config
                 _creatorMap[type] = new ConfigurationItemCreator(t => instance);
             }
 
-            TypeRegistered?.Invoke(this, new RepositoryUpdateEventArgs(type));
+            TypeRegistered?.Invoke(this, new ServiceRepositoryUpdateEventArgs(type));
         }
 
         public override object GetService(Type serviceType)
         {
-            return DefaultResolveInstance(serviceType, null);
+            var serviceInstance = DefaultResolveInstance(serviceType, null);
+            if (serviceInstance is null && serviceType.IsAbstract())
+            {
+                throw new NLogDependencyResolveException("Instance of class must be registered", serviceType);
+            }
+            return serviceInstance;
+        }
+
+        internal override bool TryGetService<T>(out T serviceInstance)
+        {
+            serviceInstance = DefaultResolveInstance(typeof(T), null) as T;
+            return !(serviceInstance is null);
         }
 
         private object DefaultResolveInstance(Type itemType, HashSet<Type> seenTypes)
         {
-            if (itemType == null)
+            if (itemType is null)
                 throw new ArgumentNullException(nameof(itemType));
 
             ConfigurationItemCreator objectResolver = null;
@@ -109,8 +109,16 @@ namespace NLog.Config
                 }
             }
 
-            if (objectResolver == null && compiledConstructor == null)
+            if (objectResolver is null && compiledConstructor is null)
             {
+                if (itemType.IsAbstract())
+                {
+                    if (seenTypes is null)
+                        return null;
+                    else
+                        throw new NLogDependencyResolveException("Instance of class must be registered", itemType);
+                }
+
                 // Do not hold lock while resolving types to avoid deadlock on initialization of type static members
                 var newCompiledConstructor = CreateCompiledConstructor(itemType);
 
@@ -126,14 +134,16 @@ namespace NLog.Config
 
             // Do not hold lock while calling constructor (or resolving parameter values) to avoid deadlock
             var constructorParameters = compiledConstructor?.Parameters;
-            if (constructorParameters != null)
+            if (constructorParameters is null)
+            {
+                return objectResolver?.Invoke(itemType) ?? compiledConstructor?.Ctor(null);
+            }
+            else
             {
                 seenTypes = seenTypes ?? new HashSet<Type>();
                 var parameterValues = CreateCtorParameterValues(constructorParameters, seenTypes);
-                return compiledConstructor.Ctor(parameterValues);
+                return compiledConstructor?.Ctor(parameterValues);
             }
-
-            return objectResolver?.Invoke(itemType) ?? compiledConstructor?.Ctor(null);
         }
 
         private CompiledConstructor CreateCompiledConstructor(Type itemType)
@@ -141,23 +151,23 @@ namespace NLog.Config
             try
             {
                 var defaultConstructor = itemType.GetConstructor(Type.EmptyTypes);
-                if (defaultConstructor != null)
-                {
-                    InternalLogger.Trace("Resolves default constructor for {0}", itemType);
-                    var constructorMethod = ReflectionHelpers.CreateLateBoundConstructor(defaultConstructor);
-                    return new CompiledConstructor(constructorMethod);
-                }
-                else
+                if (defaultConstructor is null)
                 {
                     InternalLogger.Trace("Resolves parameterized constructor for {0}", itemType);
                     var ctor = GetParameterizedConstructor(itemType);
                     var constructorMethod = ReflectionHelpers.CreateLateBoundConstructor(ctor);
                     return new CompiledConstructor(constructorMethod, ctor.GetParameters());
                 }
+                else
+                {
+                    InternalLogger.Trace("Resolves default constructor for {0}", itemType);
+                    var constructorMethod = ReflectionHelpers.CreateLateBoundConstructor(defaultConstructor);
+                    return new CompiledConstructor(constructorMethod);
+                }
             }
             catch (MissingMethodException exception)
             {
-                throw new NLogResolveException("Is the required permission granted?", exception, itemType);
+                throw new NLogDependencyResolveException("Is the required permission granted?", exception, itemType);
             }
             finally
             {
@@ -171,12 +181,12 @@ namespace NLog.Config
 
             if (ctors.Length == 0)
             {
-                throw new NLogResolveException("No public constructor", itemType);
+                throw new NLogDependencyResolveException("No public constructor", itemType);
             }
 
             if (ctors.Length > 1)
             {
-                throw new NLogResolveException("Multiple public constructor are not supported if there isn't a default constructor'", itemType);
+                throw new NLogDependencyResolveException("Multiple public constructor are not supported if there isn't a default constructor'", itemType);
             }
 
             var ctor = ctors[0];
@@ -194,7 +204,7 @@ namespace NLog.Config
                 var parameterType = param.ParameterType;
                 if (seenTypes.Contains(parameterType))
                 {
-                    throw new NLogResolveException("There is a cycle", parameterType);
+                    throw new NLogDependencyResolveException("There is a cycle", parameterType);
                 }
 
                 seenTypes.Add(parameterType);
@@ -206,7 +216,7 @@ namespace NLog.Config
             return parameterValues;
         }
 
-        private class CompiledConstructor
+        private sealed class CompiledConstructor
         {
             [NotNull] public ReflectionHelpers.LateBoundConstructor Ctor { get; }
             [CanBeNull] public ParameterInfo[] Parameters { get; }

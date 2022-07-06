@@ -1,5 +1,5 @@
 // 
-// Copyright (c) 2004-2020 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
+// Copyright (c) 2004-2021 Jaroslaw Kowalski <jaak@jkowalski.net>, Kim Christensen, Julian Verdurmen
 // 
 // All rights reserved.
 // 
@@ -40,7 +40,10 @@ namespace NLog.Targets.Wrappers
     /// </summary>
     public class LogEventDroppedEventArgs : EventArgs
     {
-        /// <inheritdoc />
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogEventDroppedEventArgs" /> class.
+        /// </summary>
+        /// <param name="logEventInfo">LogEvent that have been dropped</param>
         public LogEventDroppedEventArgs(LogEventInfo logEventInfo) => DroppedLogEventInfo = logEventInfo;
 
         /// <summary>
