@@ -192,15 +192,34 @@ namespace NLog.Internal
 
         private static bool TryImplicitConversion(Type resultType, string value, out object result)
         {
-            MethodInfo operatorImplicitMethod = resultType.GetMethod("op_Implicit", BindingFlags.Public | BindingFlags.Static, null, new Type[] { typeof(string) }, null);
-            if (operatorImplicitMethod == null)
+            try
             {
-                result = null;
-                return false;
-            }
+#if !WINDOWS_UWP
+                if (Type.GetTypeCode(resultType) != TypeCode.Object)
+#else
+                if (resultType.IsPrimitive() || resultType == typeof(string))
+#endif
+                {
+                    result = null;
+                    return false;
+                }
 
-            result = operatorImplicitMethod.Invoke(null, new object[] { value });
-            return true;
+                MethodInfo operatorImplicitMethod = resultType.GetMethod("op_Implicit", BindingFlags.Public | BindingFlags.Static, null, new Type[] { value.GetType() }, null);
+                if (operatorImplicitMethod == null || !resultType.IsAssignableFrom(operatorImplicitMethod.ReturnType))
+                {
+                    result = null;
+                    return false;
+                }
+
+                result = operatorImplicitMethod.Invoke(null, new object[] { value });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                InternalLogger.Warn(ex, "Implicit Conversion Failed of {0} to {1}", value, resultType);
+            }
+            result = null;
+            return false;
         }
 
         private static bool TryNLogSpecificConversion(Type propertyType, string value, out object newValue, ConfigurationItemFactory configurationItemFactory)
