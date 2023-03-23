@@ -19,7 +19,7 @@ namespace NLog.Internal
 				case RuntimePlatform.OSXPlayer:
 					return "file://" + Application.dataPath + "/Data/StreamingAssets/";
 				default:
-					return Application.streamingAssetsPath;
+					return "file://" + Application.streamingAssetsPath;
             }
 		}
 
